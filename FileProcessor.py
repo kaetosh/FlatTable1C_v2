@@ -6,6 +6,7 @@ Created on Mon Dec 16 14:32:00 2024
 """
 
 import os
+import collections
 from typing import List, Dict
 import pandas as pd
 from pathlib import Path
@@ -14,6 +15,14 @@ from ErrorClasses import NoExcelFilesError
 from ExcelFileConverter import ExcelFileConverter
 from ExcelFilePreprocessor import ExcelFilePreprocessor
 
+
+FieldsRegister = collections.namedtuple('FieldsRegister', ['start_debit_balance',
+                                                           'start_credit_balance',
+                                                           'debit_turnover',
+                                                           'credit_turnover',
+                                                           'end_debit_balance',
+                                                           'end_credit_balance'])
+Register_1C = collections.namedtuple('Register_1C', ['UPP', 'notUPP'])
 
 class IFileProcessor:
    
@@ -145,4 +154,20 @@ class AccountTurnoverProcessor(IFileProcessor):
         # for i in self.dict_df:
         #     self.dict_df[i].to_excel(f'{i}_обраб.xlsx')
         # print('empty_files', self.empty_files)
+
+class AccountOSVProcessor(IFileProcessor):
+    def table_header(self) -> None:
+        if not self.excel_files:
+            raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
+        for oFile in self.excel_files:
+            df: pd.DataFrame = pd.read_excel(oFile)
             
+            # Получаем индекс строки, содержащей target_value (значение)
+            index_for_columns: int or None = None
+            target_values: set = {value for sublist in name_account_balance_movements.values() for value in sublist} # Извлекаем все значения
+            indices: pd.core.indexes.base.Index = df.index[df.apply(lambda row: row.isin(target_values).any(), axis=1)]
+            if not indices.empty:
+                index_for_columns = indices[0]  # Получаем первый индекс
+            else:
+                self.empty_files.append(oFile.name)
+                continue
