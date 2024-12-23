@@ -6,7 +6,6 @@ Created on Mon Dec 16 14:32:00 2024
 """
 
 import os
-import collections
 from typing import List, Dict
 import pandas as pd
 from pathlib import Path
@@ -16,13 +15,7 @@ from ExcelFileConverter import ExcelFileConverter
 from ExcelFilePreprocessor import ExcelFilePreprocessor
 
 
-FieldsRegister = collections.namedtuple('FieldsRegister', ['start_debit_balance',
-                                                           'start_credit_balance',
-                                                           'debit_turnover',
-                                                           'credit_turnover',
-                                                           'end_debit_balance',
-                                                           'end_credit_balance'])
-Register_1C = collections.namedtuple('Register_1C', ['UPP', 'notUPP'])
+
 
 class IFileProcessor:
    
