@@ -26,6 +26,5 @@ class ExcelFileConverter:
 
     def convert_file(self, excel_app, oFile):
         wb = excel_app.Workbooks.Open(str(oFile))
-        new_file_path = oFile.stem + '.xlsx'
-        wb.SaveAs(str(new_file_path), FileFormat=51)
+        wb.SaveAs(str(oFile), FileFormat=51)  # Сохраняем под тем же именем, меняя формат
         wb.Close(SaveChanges=False)
