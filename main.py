@@ -8,10 +8,10 @@ Created on Mon Dec 16 14:42:39 2024
 from FileProcessorFactory import FileProcessorFactory
 
 def main():
-    file_type = "account_turnover"
-    processor = FileProcessorFactory.create_processor(file_type)
+    file_type = ['account_turnover', 'account_analisys', 'account_osv']
+    processor = FileProcessorFactory.create_processor(file_type[2])
     processor.process_start()
-    processor.process()
+    processor.table_header()
     processor.process_end()
 
 if __name__ == "__main__":
