@@ -5,12 +5,17 @@ Created on Mon Dec 16 14:40:14 2024
 @author: a.karabedyan
 """
 
-from FileProcessor import IFileProcessor, AccountTurnoverProcessor
+from FileProcessor import IFileProcessor, AccountTurnoverProcessor, AccountAnalisysProcessor, AccountOSVProcessor
 
 class FileProcessorFactory:
     @staticmethod
     def create_processor(file_type: str) -> IFileProcessor:
-        if file_type == "account_turnover":
-            return AccountTurnoverProcessor()
-        else:
-            raise ValueError(f"Unknown file type: {file_type}")
+        match file_type:
+            case "account_turnover":
+                return AccountTurnoverProcessor(file_type)
+            case "account_analisys":
+                return AccountAnalisysProcessor(file_type)
+            case "account_osv":
+                return AccountOSVProcessor(file_type)
+            case _:
+                raise ValueError(f"Неизвестный тип файла: {file_type}")
