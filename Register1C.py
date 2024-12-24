@@ -10,7 +10,8 @@ class FieldsRegister:
     def __init__(self,
                  analytics: str or None = None,
                  quantity: str or None = None,
-                 type_connection: str or None = None, 
+                 type_connection: str or None = None,
+                 corresponding_account: str or None = None,
                  start_debit_balance: str or None = None,
                  start_credit_balance: str or None = None, 
                  debit_turnover: str or None = None,
@@ -39,6 +40,6 @@ class Register_1C:
         self.upp = upp if upp is not None else []
         self.notupp = notupp if notupp is not None else []
     def __iter__(self):
-
         yield from self.upp
         yield from self.notupp
+    
