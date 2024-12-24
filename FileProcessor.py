@@ -9,7 +9,7 @@ import os
 from typing import List, Dict
 import pandas as pd
 from pathlib import Path
-from config import name_account_balance_movements, sign_1c_upp, sign_1c_not_upp, new_names
+from config import name_account_balance_movements, sign_1c_upp, sign_1c_not_upp, new_names, osv_filds, turnover_filds, analisys_filds
 from ErrorClasses import NoExcelFilesError
 from ExcelFileConverter import ExcelFileConverter
 from ExcelFilePreprocessor import ExcelFilePreprocessor
@@ -19,9 +19,10 @@ from ExcelFilePreprocessor import ExcelFilePreprocessor
 
 class IFileProcessor:
    
-    def __init__(self) -> None:
+    def __init__(self, file_type) -> None:
         path_folder_excel_files: Path = Path(os.getcwd())
         files: List[Path] = list(path_folder_excel_files.iterdir())
+        self.file_type = file_type
         self.sign_1c: str = sign_1c_not_upp
         self.dict_df: Dict[str, pd.DataFrame] = {}
         self.dict_df_check: Dict[str, pd.DataFrame] = {}
@@ -32,11 +33,53 @@ class IFileProcessor:
         self.converter: ExcelFileConverter = ExcelFileConverter(self.excel_files)
         self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor(self.excel_files)
         
+    def get_filds_register(self):
+        match self.file_type:
+            case "account_turnover":
+                return turnover_filds
+            case "account_analisys":
+                return analisys_filds
+            case "account_osv":
+                return osv_filds
+            case _:
+                raise ValueError(f"Неизвестный тип файла: {self.file_type}")
+    
     def process_start(self) -> None:
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         self.converter.save_as_xlsx_no_alert()
         self.preprocessor.preprocessor_openpyxl()
+    
+    def table_header(self) -> None:
+        if not self.excel_files:
+            raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
+        for oFile in self.excel_files:
+            df: pd.DataFrame = pd.read_excel(oFile)
+            
+            # Получаем индекс строки, содержащей target_value (значение)
+            index_for_columns: int or None = None
+            target_values: set = {i for i in self.get_filds_register()} # Извлекаем все значения
+            indices: pd.core.indexes.base.Index = df.index[df.apply(lambda row: row.isin(target_values).any(), axis=1)]
+            if not indices.empty:
+                index_for_columns = indices[0]  # Получаем первый индекс
+            else:
+                self.empty_files.append(oFile.name)
+                continue
+            
+            # устанавливаем заголовки
+            df.columns = df.iloc[index_for_columns].astype(str)
+            df = df.loc[:, df.columns.notna()]
+           
+            # удаляем данные выше строки, содержащей имена столбцов таблицы (наименование отчета, период и т.д.)
+            df = df.drop(df.index[0:(index_for_columns+1)])
+            df.dropna(axis=0, how='all', inplace=True) # удаляем пустые строки
+            df.dropna(axis=1, how='all', inplace=True)
+        
+            # получим наименование первого столбца, в котором находятся наши уровни
+            # переименуем этот столбец
+            df.columns.values[0] = 'Уровень'
+            self.sign_1c = sign_1c_not_upp
+            df.to_excel('1.xlsx')
     
     def process_end(self) -> None:
         print('Закончили обработку')
@@ -55,7 +98,7 @@ class AccountTurnoverProcessor(IFileProcessor):
         except StopIteration:
             return False  # Если ничего не найдено
     
-    def table_header(self) -> None:
+    def table_header_turnover(self) -> None:
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         for oFile in self.excel_files:
@@ -149,7 +192,7 @@ class AccountTurnoverProcessor(IFileProcessor):
         # print('empty_files', self.empty_files)
 
 class AccountOSVProcessor(IFileProcessor):
-    def table_header(self) -> None:
+    def table_header_OSV(self) -> None:
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         for oFile in self.excel_files:
@@ -164,3 +207,6 @@ class AccountOSVProcessor(IFileProcessor):
             else:
                 self.empty_files.append(oFile.name)
                 continue
+            
+class AccountAnalisysProcessor(IFileProcessor):
+    pass
