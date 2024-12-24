@@ -57,7 +57,6 @@ class IFileProcessor:
             df: pd.DataFrame = pd.read_excel(oFile)
             
             # Получаем индекс строки, содержащей target_value (значение)
-            index_for_columns: int or None = None
             target_values: set = {i for i in self.get_filds_register()} # Извлекаем все значения
             indices: pd.core.indexes.base.Index = df.index[df.apply(lambda row: row.isin(target_values).any(), axis=1)]
             if not indices.empty:
@@ -105,7 +104,6 @@ class AccountTurnoverProcessor(IFileProcessor):
             df: pd.DataFrame = pd.read_excel(oFile)
             
             # Получаем индекс строки, содержащей target_value (значение)
-            index_for_columns: int or None = None
             target_values: set = {value for sublist in name_account_balance_movements.values() for value in sublist} # Извлекаем все значения
             indices: pd.core.indexes.base.Index = df.index[df.apply(lambda row: row.isin(target_values).any(), axis=1)]
             if not indices.empty:
