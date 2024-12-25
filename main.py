@@ -11,7 +11,7 @@ def main():
     file_type = ['account_turnover', 'account_analisys', 'account_osv']
     processor = FileProcessorFactory.create_processor(file_type[2])
     processor.process_start()
-    processor.table_header()
+    processor.general_table_header()
     processor.process_end()
 
 if __name__ == "__main__":
