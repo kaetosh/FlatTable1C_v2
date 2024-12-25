@@ -21,6 +21,7 @@ class FieldsRegister:
         self.analytics = analytics
         self.quantity = quantity
         self.type_connection = type_connection
+        self.corresponding_account = corresponding_account
         self.start_debit_balance = start_debit_balance
         self.start_credit_balance = start_credit_balance
         self.debit_turnover = debit_turnover
@@ -28,10 +29,16 @@ class FieldsRegister:
         self.end_debit_balance = end_debit_balance
         self.end_credit_balance = end_credit_balance
     def __iter__(self):
-        return iter((self.analytics, self.quantity, self.type_connection,
-                     self.start_debit_balance, self.start_credit_balance,
-                     self.debit_turnover, self.credit_turnover,
-                     self.end_debit_balance, self.end_credit_balance))
+        return iter((self.analytics,
+                     self.quantity,
+                     self.type_connection,
+                     self.corresponding_account,
+                     self.start_debit_balance,
+                     self.start_credit_balance,
+                     self.debit_turnover,
+                     self.credit_turnover,
+                     self.end_debit_balance,
+                     self.end_credit_balance))
 
 class Register_1C:
     def __init__(self,
@@ -39,6 +46,14 @@ class Register_1C:
                  notupp: FieldsRegister or None = None):
         self.upp = upp if upp is not None else []
         self.notupp = notupp if notupp is not None else []
+    def get_attribute_name_by_value(self, value):
+        for attr_name, attr_value in vars(self).items():
+            if isinstance(attr_value, FieldsRegister):
+                # Проходим по всем атрибутам FieldsRegister
+                for inner_attr_name, inner_attr_value in vars(attr_value).items():
+                    if inner_attr_value == value:
+                        return attr_name  # Возвращаем имя внешнего атрибута
+        return None  # Если значение не найдено
     def __iter__(self):
         yield from self.upp
         yield from self.notupp
