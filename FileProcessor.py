@@ -9,6 +9,7 @@ import os
 from typing import List, Dict
 import pandas as pd
 from pathlib import Path
+from Register1C import Register_1C
 from config import name_account_balance_movements, sign_1c_upp, sign_1c_not_upp, new_names, osv_filds, turnover_filds, analisys_filds
 from ErrorClasses import NoExcelFilesError
 from ExcelFileConverter import ExcelFileConverter
@@ -23,7 +24,6 @@ class IFileProcessor:
         path_folder_excel_files: Path = Path(os.getcwd())
         files: List[Path] = list(path_folder_excel_files.iterdir())
         self.file_type = file_type
-        self.sign_1c: str = sign_1c_not_upp
         self.dict_df: Dict[str, pd.DataFrame] = {}
         self.dict_df_check: Dict[str, pd.DataFrame] = {}
         self.empty_files: List[str] = []
@@ -31,7 +31,7 @@ class IFileProcessor:
                                                                    or str(file).endswith('.xls'))
                                                                   and '_СВОД_' not in str(file)]
         self.converter: ExcelFileConverter = ExcelFileConverter(self.excel_files)
-        self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor(self.excel_files)
+        self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor(self.excel_files, self.file_type)
         
     def get_filds_register(self):
         match self.file_type:
@@ -50,35 +50,49 @@ class IFileProcessor:
         self.converter.save_as_xlsx_no_alert()
         self.preprocessor.preprocessor_openpyxl()
     
-    def table_header(self) -> None:
+    def general_table_header(self) -> None:
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         for oFile in self.excel_files:
             df: pd.DataFrame = pd.read_excel(oFile)
-            
-            # Получаем индекс строки, содержащей target_value (значение)
-            target_values: set = {i for i in self.get_filds_register()} # Извлекаем все значения
-            indices: pd.core.indexes.base.Index = df.index[df.apply(lambda row: row.isin(target_values).any(), axis=1)]
-            if not indices.empty:
-                index_for_columns = indices[0]  # Получаем первый индекс
+            register: Register_1C = self.get_filds_register()
+            target_values: set = {i for i in register}
+    
+            # Найдем первый индекс совпадения и значение
+            match_index = None
+            first_valid_value = None
+    
+            for idx, row in df.iterrows():
+                # Ищем первое совпадение
+                matched_values = row[row.isin(target_values)]
+                if not matched_values.empty:
+                    match_index = idx
+                    first_valid_value = matched_values.iloc[0]
+                    break
+    
+            if match_index is not None:
+                self.sign_1c = register.get_attribute_name_by_value(first_valid_value)
+    
+                # Устанавливаем заголовки и очищаем данные
+                df.columns = df.iloc[match_index].astype(str)
+                df = df.loc[:, df.columns.notna()]
+                df = df.drop(df.index[0:(match_index + 1)])
+                df.dropna(axis=0, how='all', inplace=True)
+                df.dropna(axis=1, how='all', inplace=True)
+                
+                # переименуем столбцы, в которых находятся наши уровни и признаки курсива
+                df.columns.values[0] = 'Уровень'
+                if self.file_type == 'account_analisys' and df.iloc[:, 1].isin([0, 1]).all():
+                    df.columns.values[1] = 'Курсив'
+                df['Исх.файл'] = oFile.name
+                
+                # запишем таблицу в словарь
+                self.dict_df[oFile.name] = df
             else:
                 self.empty_files.append(oFile.name)
-                continue
-            
-            # устанавливаем заголовки
-            df.columns = df.iloc[index_for_columns].astype(str)
-            df = df.loc[:, df.columns.notna()]
-           
-            # удаляем данные выше строки, содержащей имена столбцов таблицы (наименование отчета, период и т.д.)
-            df = df.drop(df.index[0:(index_for_columns+1)])
-            df.dropna(axis=0, how='all', inplace=True) # удаляем пустые строки
-            df.dropna(axis=1, how='all', inplace=True)
-        
-            # получим наименование первого столбца, в котором находятся наши уровни
-            # переименуем этот столбец
-            df.columns.values[0] = 'Уровень'
-            self.sign_1c = sign_1c_not_upp
-            df.to_excel('1.xlsx')
+    
+    def special_table_header(self) -> None:
+        pass
     
     def process_end(self) -> None:
         print('Закончили обработку')
@@ -97,34 +111,10 @@ class AccountTurnoverProcessor(IFileProcessor):
         except StopIteration:
             return False  # Если ничего не найдено
     
-    def table_header_turnover(self) -> None:
-        if not self.excel_files:
-            raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
-        for oFile in self.excel_files:
-            df: pd.DataFrame = pd.read_excel(oFile)
-            
-            # Получаем индекс строки, содержащей target_value (значение)
-            target_values: set = {value for sublist in name_account_balance_movements.values() for value in sublist} # Извлекаем все значения
-            indices: pd.core.indexes.base.Index = df.index[df.apply(lambda row: row.isin(target_values).any(), axis=1)]
-            if not indices.empty:
-                index_for_columns = indices[0]  # Получаем первый индекс
-            else:
-                self.empty_files.append(oFile.name)
-                continue
-            
-            # устанавливаем заголовки
-            df.columns = df.iloc[index_for_columns].astype(str)
-            df = df.loc[:, df.columns.notna()]
-           
-            # удаляем данные выше строки, содержащей имена столбцов таблицы (наименование отчета, период и т.д.)
-            df = df.drop(df.index[0:(index_for_columns+1)])
-            df.dropna(axis=0, how='all', inplace=True) # удаляем пустые строки
-            df.dropna(axis=1, how='all', inplace=True)
-        
-            # получим наименование первого столбца, в котором находятся наши уровни
-            # переименуем этот столбец
-            df.columns.values[0] = 'Уровень'
-            self.sign_1c = sign_1c_not_upp
+    def special_table_header(self) -> None:
+
+        for i in self.dict_df:
+            df = self.dict_df[i]
             
             indices_to_rename: List[int] = []
             
