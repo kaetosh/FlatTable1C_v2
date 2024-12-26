@@ -12,6 +12,7 @@ def main():
     processor = FileProcessorFactory.create_processor(file_type[2])
     processor.process_start()
     processor.general_table_header()
+    processor.special_table_header()
     processor.process_end()
 
 if __name__ == "__main__":
