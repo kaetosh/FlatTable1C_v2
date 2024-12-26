@@ -5,6 +5,9 @@ Created on Mon Dec 16 15:26:33 2024
 @author: a.karabedyan
 """
 
+from dataclasses import dataclass
+import pandas as pd
+
 # поля регистров 1с
 class FieldsRegister:
     def __init__(self,
@@ -47,6 +50,11 @@ class Register_1C:
         self.upp = upp if upp is not None else []
         self.notupp = notupp if notupp is not None else []
     def get_attribute_name_by_value(self, value):
+        """
+        Метод, который ищет атрибут внешнего класса Register_1C по значению
+        атрибута внутреннего класса FieldsRegister
+        (признак версии 1С: УПП или нет).
+        """
         for attr_name, attr_value in vars(self).items():
             if isinstance(attr_value, FieldsRegister):
                 # Проходим по всем атрибутам FieldsRegister
@@ -54,7 +62,29 @@ class Register_1C:
                     if inner_attr_value == value:
                         return attr_name  # Возвращаем имя внешнего атрибута
         return None  # Если значение не найдено
+    def get_inner_attribute_by_value(self, value):
+        """
+        Метод, который ищет атрибут внутреннего класса FieldsRegister по значению
+        атрибута внутреннего класса FieldsRegister.
+        """
+        for attr_value in (self.upp, self.notupp):
+            if isinstance(attr_value, FieldsRegister):
+                for inner_attr_name, inner_attr_value in vars(attr_value).items():
+                    if inner_attr_value == value:
+                        return inner_attr_name  # Возвращаем имя атрибута внутреннего класса
+        return None  # Если значение не найдено
     def __iter__(self):
         yield from self.upp
         yield from self.notupp
-    
+
+@dataclass
+class Table_storage:
+    table: str
+    register: Register_1C
+    sign_1C: pd.DataFrame
+
+    def set_index_column(self, name_atribure, value):
+        # Формируем имя атрибута
+        attr_name = f'index_column_{name_atribure}'
+        # Устанавливаем значение атрибута
+        setattr(self, attr_name, value)
