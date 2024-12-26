@@ -19,21 +19,18 @@ sign_1c_upp = 'Субконто'
 sign_1c_not_upp = 'Счет'
 
 new_names = ['Дебет_начало',
-                 'Кредит_начало',
-                 'Дебет_оборот',
-                 'Кредит_оборот',
-                 'Дебет_конец',
-                 'Кредит_конец']
+             'Кредит_начало',
+             'Дебет_оборот',
+             'Кредит_оборот',
+             'Дебет_конец',
+             'Кредит_конец']
 
 # поля ОСВ в качестве первичного залоговка таблицы
 filds_osv_upp = FieldsRegister(analytics='Субконто',
                                type_connection = 'Вид связи КА за период', 
-                               start_debit_balance = 'Нач. сальдо деб.',
-                               start_credit_balance = 'Нач. сальдо кред.', 
-                               debit_turnover = 'Деб. оборот',
-                               credit_turnover = 'Кред. оборот', 
-                               end_debit_balance = 'Кон. сальдо деб.',
-                               end_credit_balance = 'Кон. сальдо кред.')
+                               start_debit_balance = 'Сальдо на начало периода',
+                               debit_turnover = 'Оборот за период',
+                               end_debit_balance = 'Сальдо на конец периода')
 
 filds_osv_notupp = FieldsRegister(analytics='Счет',
                                   quantity='Показа-\nтели',
