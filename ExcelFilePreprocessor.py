@@ -54,3 +54,4 @@ class ExcelFilePreprocessor:
                         break
 
             workbook.save(oFile)
+            workbook.close()
