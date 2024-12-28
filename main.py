@@ -17,6 +17,10 @@ def main():
     processor.horizontal_structure()
     processor.corr_account_col()
     processor.lines_delete()
+    processor.joining_tables()
+    processor.shiftable_level()
+    processor.rename_columns()
+    processor.unloading_pivot_table()
     processor.process_end()
 
 if __name__ == "__main__":
