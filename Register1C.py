@@ -45,8 +45,10 @@ class FieldsRegister:
 
 class Register_1C:
     def __init__(self,
+                 name_register: str or None,
                  upp: FieldsRegister or None = None,
                  notupp: FieldsRegister or None = None):
+        self.name_register = name_register
         self.upp = upp if upp is not None else []
         self.notupp = notupp if notupp is not None else []
     def get_attribute_name_by_value(self, value):
@@ -76,12 +78,16 @@ class Register_1C:
     def __iter__(self):
         yield from self.upp
         yield from self.notupp
+    
+    def __str__(self):
+        return(f'{self.name_register}')
 
 @dataclass
 class Table_storage:
-    table: str
+    table: pd.DataFrame
     register: Register_1C
-    sign_1C: pd.DataFrame
+    sign_1C: str
+    table_type_connection: pd.DataFrame = None
 
     def set_index_column(self, name_atribure, value):
         # Формируем имя атрибута
