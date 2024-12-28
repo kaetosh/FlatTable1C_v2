@@ -9,8 +9,11 @@ import os
 from typing import List, Dict
 import pandas as pd
 pd.options.mode.copy_on_write = False
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 1000)
 import numpy as np
 from pathlib import Path
+from progress_bar import progress_bar
 from Register1C import Register_1C, Table_storage
 from config import new_names, osv_filds, turnover_filds, analisys_filds, exclude_values, acc_out_subacc
 from ErrorClasses import NoExcelFilesError
@@ -34,6 +37,7 @@ class IFileProcessor:
                                                                   and '_СВОД_' not in str(file)]
         self.converter: ExcelFileConverter = ExcelFileConverter(self.excel_files)
         self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor(self.excel_files, self.file_type)
+        self.register: Register_1C = self.get_filds_register()
         
     def get_filds_register(self):
         match self.file_type:
@@ -104,14 +108,15 @@ class IFileProcessor:
                 return True
         return False
         
-    
     def general_table_header(self) -> None:
+        print('Длина списка файлов', len(self.excel_files))
+        
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         for oFile in self.excel_files:
             df: pd.DataFrame = pd.read_excel(oFile)
-            register: Register_1C = self.get_filds_register()
-            target_values: set = {i for i in register}
+            #register: Register_1C = self.get_filds_register()
+            target_values: set = {i for i in self.register}
     
             # Найдем первый индекс совпадения и значение
             match_index = None
@@ -123,7 +128,7 @@ class IFileProcessor:
                 if not matched_values.empty:
                     match_index = idx
                     first_valid_value = matched_values.iloc[0]
-                    if register is not analisys_filds:
+                    if self.register is not analisys_filds:
                         break
                     else:
                         for i in matched_values:
@@ -148,11 +153,12 @@ class IFileProcessor:
                 df['Исх.файл'] = oFile.name
                 
                 # запишем таблицу в словарь
-                sign_1c = register.get_attribute_name_by_value(first_valid_value)
-                self.dict_df[oFile.name] = Table_storage(table=df, register=register, sign_1C=sign_1c)
+                sign_1c = self.register.get_attribute_name_by_value(first_valid_value)
+                self.dict_df[oFile.name] = Table_storage(table=df, register=self.register, sign_1C=sign_1c)
+            
             else:
                 self.empty_files.append(oFile.name)
-            
+            progress_bar(i + 1, len(self.excel_files), prefix='Progress')
     
     def special_table_header(self) -> None:
         for file in self.dict_df:
@@ -219,16 +225,168 @@ class IFileProcessor:
             # запишем таблицу в словарь
             self.dict_df[file].table = df
             
-        # список проблемных файлов и проч удалить потом
-        # for i in self.dict_df:
-        #     self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
-        # print('empty_files', self.empty_files)
+        
             
     def corr_account_col(self) -> None:
         pass
     
-    def lines_delete(self) -> None:
-        pass
+    def lines_delete(self):
+        
+        for file in self.dict_df:
+            df = self.dict_df[file].table
+            sign_1c = self.dict_df[file].sign_1C
+            register = self.dict_df[file].register
+            register_filds = getattr(register, sign_1c)
+
+            df[register_filds.analytics] = df[register_filds.analytics].astype(str)
+            
+            # Определяем желаемый порядок столбцов
+            desired_order = [
+                'Дебет_начало',
+                'Кредит_начало',
+                'Дебет_оборот',
+                'Кредит_оборот',
+                'Дебет_конец',
+                'Кредит_конец'
+            ]
+            
+            # Находим столбцы, заканчивающиеся на '_до' и '_ко'
+            do_columns = df.filter(regex='_до$').columns.tolist()
+            ko_columns = df.filter(regex='_ко$').columns.tolist()
+            
+            do_columns.sort()
+            ko_columns.sort()
+            
+            # Добавляем найденные столбцы к желаемому порядку
+            desired_order.extend(do_columns)
+            desired_order.append('Кредит_оборот')
+            desired_order.extend(ko_columns)
+            desired_order.append('Дебет_конец')
+            desired_order.append('Кредит_конец')
+            desired_order = [col for col in desired_order if col in df.columns]
+        
+            if sign_1c == 'upp' and df[register_filds.analytics].isin(['Количество']).any():
+                for i in desired_order:
+                    df[f'Количество_{i}'] = df[i].shift(-1)
+            elif sign_1c == 'notupp' and register_filds.quantity:
+                for i in desired_order:
+                    df[f'Количество_{i}'] = df[i].shift(-1)
+        
+            max_level = df['Уровень'].max()
+            
+            df = df[~df[register_filds.analytics].str.contains('Итого')]
+            df = df[~df[register_filds.analytics].str.contains('Количество')]
+            if register_filds.quantity in df.columns:
+                df = df[~df[register_filds.quantity].str.contains('Кол.', na=False)]
+                df = df.drop([register_filds.quantity], axis=1)
+            
+            for i in range(max_level):
+                df = df[~((df['Уровень']==i) & (df[register_filds.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
+        
+            df = df[~df[register_filds.analytics].isin(exclude_values)].copy()
+            df[register_filds.analytics] = df[register_filds.analytics].astype(str)
+        
+            # Список необходимых столбцов
+            required_columns = ['Дебет_начало', 'Кредит_начало', 'Дебет_оборот', 'Кредит_оборот', 'Дебет_конец', 'Кредит_конец']
+            
+            # Отбор существующих столбцов
+            existing_columns = [col for col in required_columns if col in df.columns]
+            
+            df = df[df[existing_columns].notna().any(axis=1)]
+            df = df.rename(columns={'Счет': 'Субконто'})
+            df.drop('Уровень', axis=1, inplace=True)
+            
+            # запишем таблицу в словарь
+            self.dict_df[file].table = df
+        # список проблемных файлов и проч удалить потом
+        # for i in self.dict_df:
+        #     self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
+        # print('empty_files', self.empty_files)
+    
+    def joining_tables(self) -> None:
+        list_tables_for_joining = [self.dict_df[i].table for i in self.dict_df]
+        self.pivot_table = pd.concat(list_tables_for_joining)
+        
+    def shiftable_level(self) -> None:
+        for j in range(5):
+            list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
+            for i in list_lev:
+                # если в столбце есть и субсчет и субконто, нужно выравнивать столбцы
+                if self.pivot_table[i].apply(self.is_accounting_code).nunique() == 2:
+                    shift_level = i  # получили столбец, в котором есть и субсчет и субконто, например Level_2
+                    lm = int(shift_level.split('_')[-1])  # получим его хвостик, например 2
+                    # получим перечень столбцов, которые бум двигать (первый - это столбец, где есть и субсчет и субконто)
+                    new_list_lev = list_lev[lm:]
+                    # сдвигаем:
+                    self.pivot_table[new_list_lev] = self.pivot_table.apply(
+                        lambda x: pd.Series([x[i] for i in new_list_lev]) if self.is_accounting_code(
+                            x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1)
+                    break
+                
+    def rename_columns(self) -> None:
+
+        # Разделяем столбцы на две группы
+        level_columns = [col for col in self.pivot_table.columns if 'Level_' in col]
+        
+        # Сортируем столбцы с Level_ по числовому значению в их названиях
+        level_columns.sort(key=lambda x: int(x.split('_')[1]))
+        
+        new_names_for_upp = {self.register.upp.analytics: 'Аналитика',
+                             self.register.upp.start_debit_balance: 'Дебет_начало',
+                             self.register.upp.start_credit_balance: 'Кредит_начало',
+                             self.register.upp.debit_turnover: 'Дебет_оборот',
+                             self.register.upp.credit_turnover: 'Кредит_оборот',
+                             self.register.upp.end_debit_balance: 'Дебет_конец',
+                             self.register.upp.end_credit_balance: 'Кредит_конец'}
+        new_names_for_notupp = {self.register.notupp.analytics: 'Аналитика',
+                                self.register.notupp.start_debit_balance: 'Дебет_начало',
+                                self.register.notupp.start_credit_balance: 'Кредит_начало',
+                                self.register.notupp.debit_turnover: 'Дебет_оборот',
+                                self.register.notupp.credit_turnover: 'Кредит_оборот',
+                                self.register.notupp.end_debit_balance: 'Дебет_конец',
+                                self.register.notupp.end_credit_balance: 'Кредит_конец'}
+        
+        self.pivot_table = self.pivot_table.rename(columns=new_names_for_upp, errors='ignore')
+        self.pivot_table = self.pivot_table.rename(columns=new_names_for_notupp, errors='ignore')
+            
+        # Определяем желаемый порядок столбцов
+        desired_order = [
+            'Исх.файл',
+            'Аналитика',
+            'Дебет_начало',
+            'Количество_Дебет_начало',
+            'Кредит_начало',
+            'Количество_Кредит_начало',
+            'Дебет_оборот',
+            'Количество_Дебет_оборот'
+        ]
+        
+        # Находим столбцы, заканчивающиеся на '_до' и '_ко'
+        do_columns = self.pivot_table.filter(regex='_до$').columns.tolist()
+        ko_columns = self.pivot_table.filter(regex='_ко$').columns.tolist()
+        
+        do_columns.sort()
+        ko_columns.sort()
+        
+        # Добавляем найденные столбцы к желаемому порядку
+        desired_order.extend(do_columns)
+        desired_order.append('Кредит_оборот')
+        desired_order.append('Количество_Кредит_оборот')
+        desired_order.extend(ko_columns)
+        desired_order.append('Дебет_конец')
+        desired_order.append('Количество_Дебет_конец')
+        desired_order.append('Кредит_конец')
+        desired_order.append('Количество_Кредит_конец')
+        
+        # Отбор существующих столбцов
+        existing_columns = [col for col in desired_order if col in self.pivot_table.columns]
+        
+        # Используем reindex для сортировки DataFrame
+        self.pivot_table = self.pivot_table.reindex(columns=(existing_columns + level_columns)).copy()
+        
+    def unloading_pivot_table(self) -> None:
+        self.pivot_table.to_excel('Сводная_таблица.xlsx', index=False)
+            
     
     def process_end(self) -> None:
         print('Закончили обработку')
@@ -303,7 +461,6 @@ class AccountTurnoverProcessor(IFileProcessor):
             # запишем таблицу в словарь
             self.dict_df[file].table = df
             
-        
 
 class AccountOSVProcessor(IFileProcessor):
     def special_table_header(self) -> None:
@@ -342,6 +499,7 @@ class AccountOSVProcessor(IFileProcessor):
             
             # запишем таблицу в словарь
             self.dict_df[file].table = df
+        
             
 class AccountAnalisysProcessor(IFileProcessor):
     def handle_missing_values(self):
@@ -350,6 +508,19 @@ class AccountAnalisysProcessor(IFileProcessor):
             sign_1c = self.dict_df[file].sign_1C
             register_filds = getattr(analisys_filds, sign_1c)
             
+            
+            
+            # сохраним столбец "Вид связи КА" в отдельный фрейм
+            # чтобы в методе lines_delete проставить пропущенные значения "Вид связи КА"
+            if register_filds.type_connection in df.columns:
+                df_type_connection = (
+                        df
+                        .drop_duplicates(subset=[register_filds.analytics, register_filds.type_connection])
+                        .dropna(subset=[register_filds.analytics, register_filds.type_connection])  # Удаляем строки с NaN в указаных столбцах
+                        .loc[:, [register_filds.analytics, register_filds.type_connection]]
+                    )
+                self.dict_df[file].table_type_connection = df_type_connection
+
             # Проверка на пропуски и условия для заполнения
             mask = (
                 df[register_filds.analytics].isna() &
@@ -369,6 +540,9 @@ class AccountAnalisysProcessor(IFileProcessor):
             # Добавление '0' к счетам до 10
             df[register_filds.analytics] = df[register_filds.analytics].apply(
                 lambda x: f'0{x}' if (len(x) == 1 and self.is_accounting_code(x)) else x)
+            
+            
+            
             
             # Запишем таблицу в словарь
             self.dict_df[file].table = df
@@ -417,7 +591,10 @@ class AccountAnalisysProcessor(IFileProcessor):
                     all_acc_dict[item] += 1
                 else:
                     all_acc_dict[item] = 1
-        
+                    
+            print(df[df.columns.to_list()[:5]].head(20))
+            print()
+            
             # счета с субсчетами
             acc_with_sub = [i for i in all_acc_dict if self.is_parent(i, all_acc_dict)]
         
@@ -453,9 +630,15 @@ class AccountAnalisysProcessor(IFileProcessor):
 
                 df['С кред. счетов_КОЛ'] = df[register_filds.debit_turnover].shift(-1)
                 df['В дебет счетов_КОЛ'] = df[register_filds.credit_turnover].shift(-1)
+                if register_filds.quantity in df.columns:
+                    df = df[df[register_filds.quantity] != 'Кол.'].copy()
                 values_with_quantity = True
+            
+            # Заполняем пропущенные значения в столбце Вид_связи    
+            if register_filds.type_connection in df.columns:
+                merged = df.merge(self.dict_df[file].table_type_connection, on=register_filds.analytics, how='left', suffixes=('', '_B'))
+                df[register_filds.type_connection] = df[register_filds.type_connection].fillna(merged[f'{register_filds.type_connection}_B'])
 
-        
             df = df[
                 ~df[register_filds.corresponding_account].isin(exclude_values) &  # Исключение определенных значений (Сальдо, Оборот и т.д.)
                 ~df[register_filds.corresponding_account].isin(del_acc) # Исключение счетов, по которым есть расшифровка субконто (60, 60.01 и т.д.)
@@ -484,11 +667,20 @@ class AccountAnalisysProcessor(IFileProcessor):
                                     register_filds.credit_turnover: 'В дебет счетов'})
         
             # Указываем желаемый порядок для известных столбцов
-            desired_order = ['Исх.файл', 'Субсчет', 'Аналитика', 'Корр_счет', 'Субконто_корр_счета', 'С кред. счетов', 'В дебет счетов']
+            desired_order = ['Исх.файл',
+                             'Субсчет',
+                             'Аналитика',
+                             'Вид связи КА за период',
+                             'Корр_счет',
+                             'Субконто_корр_счета',
+                             'С кред. счетов',
+                             'В дебет счетов']
+            
             if values_with_quantity:
                 desired_order = ['Исх.файл',
                                 'Субсчет',
                                 'Аналитика',
+                                'Вид связи КА за период',
                                 'Корр_счет',
                                 'Субконто_корр_счета',
                                 'С кред. счетов',
@@ -496,6 +688,8 @@ class AccountAnalisysProcessor(IFileProcessor):
                                 'В дебет счетов',
                                 'В дебет счетов_КОЛ']
         
+            desired_order = [item for item in desired_order if item in df.columns.to_list()]
+            
             # Находим все столбцы, содержащие 'Level_'
             level_columns = [col for col in df.columns.to_list() if 'Level_' in col]
         
@@ -504,6 +698,7 @@ class AccountAnalisysProcessor(IFileProcessor):
         
             # Переупорядочиваем столбцы в DataFrame
             df = df[new_order]
+            
             df.loc[:, 'Субконто_корр_счета'] = df['Субконто_корр_счета'].apply(
                 lambda x: 'Не расшифровано' if self.is_accounting_code(x) else x)
         
@@ -515,6 +710,44 @@ class AccountAnalisysProcessor(IFileProcessor):
             self.dict_df[file].table = df
             
         # список проблемных файлов и проч удалить потом
-        for i in self.dict_df:
-            self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
-        print('empty_files', self.empty_files)
+        # for i in self.dict_df:
+        #     self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
+        # print('empty_files', self.empty_files)
+        
+    def rename_columns(self) -> None:
+        list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
+        for n in list_lev[::-1]:
+            if all(self.pivot_table[n].apply(self.is_accounting_code)):
+                self.pivot_table['Субсчет'] = self.pivot_table[n].copy()
+                break
+        
+        
+        for p in list_lev:
+            if not all(self.pivot_table[p].apply(self.is_accounting_code)):
+                self.pivot_table['Аналитика'] = self.pivot_table['Аналитика'].where(self.pivot_table['Аналитика']!= 'Не_указано', self.pivot_table[p])
+                break
+     
+        self.pivot_table['Субсчет'] = self.pivot_table.apply(
+            lambda row: row['Субсчет'] if (str(row['Субсчет'])!= '7') else f"0{row['Субсчет']}",
+            axis=1)
+        
+            
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
