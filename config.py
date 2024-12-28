@@ -27,6 +27,7 @@ new_names = ['Дебет_начало',
 
 exclude_values = ['Нач.сальдо',
                   'Оборот',
+                  'Итого оборот',
                   'Кон.сальдо',
                   'Начальное сальдо',
                   'Конечное сальдо',
@@ -49,7 +50,7 @@ filds_osv_notupp = FieldsRegister(analytics='Счет',
                                   debit_turnover = 'Обороты за период',
                                   end_debit_balance = 'Сальдо на конец периода	')
 
-osv_filds = Register_1C(filds_osv_upp, filds_osv_notupp)
+osv_filds = Register_1C('osv', filds_osv_upp, filds_osv_notupp)
 
 
 # поля Обороты счета в качестве первичного залоговка таблицы
@@ -71,7 +72,7 @@ filds_turnover_notupp = FieldsRegister(analytics='Счет',
                                   end_debit_balance = 'Конечное сальдо Дт',
                                   end_credit_balance = 'Конечное сальдо Кт')
 
-turnover_filds = Register_1C(filds_turnover_upp, filds_turnover_notupp)
+turnover_filds = Register_1C('turnover', filds_turnover_upp, filds_turnover_notupp)
 
 # поля Анализ счета в качестве первичного залоговка таблицы
 filds_analisys_upp = FieldsRegister(analytics='Счет',
@@ -86,4 +87,4 @@ filds_analisys_notupp = FieldsRegister(analytics='Счет',
                                        debit_turnover = 'Дебет',
                                        credit_turnover = 'Кредит')
 
-analisys_filds = Register_1C(filds_analisys_upp, filds_analisys_notupp)
+analisys_filds = Register_1C('analisys', filds_analisys_upp, filds_analisys_notupp)
