@@ -2,29 +2,34 @@
 """
 Created on Mon Dec 16 16:18:41 2024
 
-@author: a.karabedyan
+@author: kaetosh
+
+Обработка ошибки при использовании openpyxl:
+KeyError: "There is no item named 'xl/sharedStrings.xml' in the archive".
+Excel-файл по своей сути — это архив данных, который можно открыть любым архиватором.
+В его составе есть файл (см. папку "xl" архива) sharedStrings.xml, который хранит все текстовые поля excel-файла.
+Некоторые версии 1С при выгрузке и сохранении своих отчетов (ОСВ, анализ счета и т.д.)
+использует старую версию excel, которая создает файл SharedStrings.xml и его название начинается
+с верхнего регистра. А современные версии Excel делают это с нижнего.
+Пересохранение позволяет пересоздать проблемный файл как xl/sharedStrings.xml,
+имя которого начинается с нижнего регистра.
 """
 
 import win32com.client
 
 
 class ExcelFileConverter:
-
     def __init__(self, excel_files):
         self.excel_files = excel_files
-    
     def save_as_xlsx_no_alert(self):
         excel_app = win32com.client.Dispatch('Excel.Application')
         excel_app.Visible = False
         excel_app.DisplayAlerts = False
-        
-        for oFile in self.excel_files:
-            self.convert_file(excel_app, oFile)
-                
+        for file in self.excel_files:
+            self.convert_file(excel_app, file)
         excel_app.Quit()
-        print('Файлы пересохранены')
-
-    def convert_file(self, excel_app, oFile):
-        wb = excel_app.Workbooks.Open(str(oFile))
-        wb.SaveAs(str(oFile), FileFormat=51)  # Сохраняем под тем же именем, меняя формат
+    @staticmethod
+    def convert_file(excel_app, file):
+        wb = excel_app.Workbooks.Open(str(file))
+        wb.SaveAs(str(file), FileFormat=51)  # Сохраняем под тем же именем, меняя формат
         wb.Close(SaveChanges=False)

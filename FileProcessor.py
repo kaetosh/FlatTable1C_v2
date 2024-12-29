@@ -13,9 +13,8 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 import numpy as np
 from pathlib import Path
-from progress_bar import progress_bar
-from Register1C import Register_1C, Table_storage
-from config import new_names, osv_filds, turnover_filds, analisys_filds, exclude_values, acc_out_subacc
+from Register1C import Register1c, TableStorage
+from config import new_names, osv_fields, turnover_fields, analysis_fields, exclude_values, accounts_without_subaccount
 from ErrorClasses import NoExcelFilesError
 from ExcelFileConverter import ExcelFileConverter
 from ExcelFilePreprocessor import ExcelFilePreprocessor
@@ -26,10 +25,11 @@ from ExcelFilePreprocessor import ExcelFilePreprocessor
 class IFileProcessor:
    
     def __init__(self, file_type) -> None:
+        self.pivot_table: pd.DataFrame = pd.DataFrame()
         path_folder_excel_files: Path = Path(os.getcwd())
         files: List[Path] = list(path_folder_excel_files.iterdir())
         self.file_type = file_type
-        self.dict_df: Dict[str, pd.DataFrame] = {}
+        self.dict_df: Dict[str, TableStorage] = {}
         self.dict_df_check: Dict[str, pd.DataFrame] = {}
         self.empty_files: List[str] = []
         self.excel_files: List[Path] = [file for file in files if (str(file).endswith('.xlsx') 
@@ -37,20 +37,21 @@ class IFileProcessor:
                                                                   and '_СВОД_' not in str(file)]
         self.converter: ExcelFileConverter = ExcelFileConverter(self.excel_files)
         self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor(self.excel_files, self.file_type)
-        self.register: Register_1C = self.get_filds_register()
+        self.register: Register1c = self.get_fields_register()
         
-    def get_filds_register(self):
+    def get_fields_register(self):
         match self.file_type:
             case "account_turnover":
-                return turnover_filds
-            case "account_analisys":
-                return analisys_filds
+                return turnover_fields
+            case "account_analysis":
+                return analysis_fields
             case "account_osv":
-                return osv_filds
+                return osv_fields
             case _:
                 raise ValueError(f"Неизвестный тип файла: {self.file_type}")
-    
-    def is_accounting_code(self, value):
+
+    @staticmethod
+    def is_accounting_code(value):
         if value:
             # Проверка на значение "000"
             if str(value) == "000":
@@ -65,8 +66,9 @@ class IFileProcessor:
                 return False
         else:
             return False
-    
-    def fill_level(self, row, prev_value, level, sign_1c) -> float:
+
+    @staticmethod
+    def fill_level(row, prev_value, level, sign_1c) -> float:
         if row['Уровень'] == level:
             return row[sign_1c]
         else:
@@ -79,7 +81,8 @@ class IFileProcessor:
         self.preprocessor.preprocessor_openpyxl()
     
     # определяет родительские счета
-    def get_parent_accounts(self, account) -> List[str]:
+    @staticmethod
+    def get_parent_accounts(account) -> List[str]:
         parent_accounts = []
         for i in range(1, account.count('.') + 1):
             parent = '.'.join(account.split('.')[:-i])
@@ -88,7 +91,8 @@ class IFileProcessor:
         return parent_accounts
     
     # определяет счета, у которых нет субсчетов
-    def accounting_code_without_subaccount(self, accounting_codes):
+    @staticmethod
+    def accounting_code_without_subaccount(accounting_codes):
         accounting_codes_xx = [i[:2] for i in accounting_codes]
         count_dict = {}
         for item in accounting_codes_xx:
@@ -102,7 +106,8 @@ class IFileProcessor:
         return result
     
     # Функция для проверки того, является ли счет без субсчетов
-    def is_parent(self, account, accounts):
+    @staticmethod
+    def is_parent(account, accounts):
         for acc in accounts:
             if acc.startswith(account + '.') and acc != account:
                 return True
@@ -115,11 +120,10 @@ class IFileProcessor:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         for oFile in self.excel_files:
             df: pd.DataFrame = pd.read_excel(oFile)
-            #register: Register_1C = self.get_filds_register()
             target_values: set = {i for i in self.register}
     
             # Найдем первый индекс совпадения и значение
-            match_index = None
+            match_index = 0
             first_valid_value = None
             
     
@@ -128,12 +132,12 @@ class IFileProcessor:
                 if not matched_values.empty:
                     match_index = idx
                     first_valid_value = matched_values.iloc[0]
-                    if self.register is not analisys_filds:
+                    if self.register is not analysis_fields:
                         break
                     else:
                         for i in matched_values:
-                            if i in [analisys_filds.upp.corresponding_account,
-                                     analisys_filds.notupp.corresponding_account]:
+                            if i in [analysis_fields.upp.corresponding_account,
+                                     analysis_fields.notupp.corresponding_account]:
                                 first_valid_value = i
                                 break
                         break
@@ -148,17 +152,16 @@ class IFileProcessor:
                 
                 # переименуем столбцы, в которых находятся наши уровни и признаки курсива
                 df.columns.values[0] = 'Уровень'
-                if self.file_type == 'account_analisys' and df.iloc[:, 1].isin([0, 1]).all():
+                if self.file_type == 'account_analysis' and df.iloc[:, 1].isin([0, 1]).all():
                     df.columns.values[1] = 'Курсив'
                 df['Исх.файл'] = oFile.name
                 
                 # запишем таблицу в словарь
-                sign_1c = self.register.get_attribute_name_by_value(first_valid_value)
-                self.dict_df[oFile.name] = Table_storage(table=df, register=self.register, sign_1C=sign_1c)
+                sign_1c = self.register.get_outer_attribute_name_by_value(first_valid_value)
+                self.dict_df[oFile.name] = TableStorage(table=df, register=self.register, sign_1C=sign_1c)
             
             else:
                 self.empty_files.append(oFile.name)
-            progress_bar(i + 1, len(self.excel_files), prefix='Progress')
     
     def special_table_header(self) -> None:
         for file in self.dict_df:
@@ -173,25 +176,25 @@ class IFileProcessor:
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
             register = self.dict_df[file].register
-            register_filds = getattr(register, sign_1c)
+            register_fields = getattr(register, sign_1c)
     
-            if register_filds.quantity in df.columns:
-                mask = df[register_filds.quantity].str.contains('Кол.', na=False)
-                df.loc[~mask, register_filds.analytics] = df.loc[~mask, register_filds.analytics].fillna('Не_заполнено')
-                df[register_filds.analytics] = df[register_filds.analytics].ffill()
+            if register_fields.quantity in df.columns:
+                mask = df[register_fields.quantity].str.contains('Кол.', na=False)
+                df.loc[~mask, register_fields.analytics] = df.loc[~mask, register_fields.analytics].fillna('Не_заполнено')
+                df[register_fields.analytics] = df[register_fields.analytics].ffill()
             else:
-                # проставляем значение "Количество" (для ОСВ, т.к. строки с количеством не обозначены)
+                # Проставляем значение "Количество" (для ОСВ, так как строки с количеством не обозначены)
 
-                df[register_filds.analytics] = np.where(
-                                            df[register_filds.analytics].isna() & df['Уровень'].eq(df['Уровень'].shift(1)),
+                df[register_fields.analytics] = np.where(
+                                            df[register_fields.analytics].isna() & df['Уровень'].eq(df['Уровень'].shift(1)),
                                             'Количество',
-                                            df[register_filds.analytics]
+                                            df[register_fields.analytics]
                                         )
-                df[register_filds.analytics].fillna('Не_заполнено', inplace=True)
+                df[register_fields.analytics].fillna('Не_заполнено', inplace=True)
                 
     
             # Преобразование в строки и добавление ведущего нуля при необходимости
-            df[register_filds.analytics] = df[register_filds.analytics].astype(str).apply(
+            df[register_fields.analytics] = df[register_fields.analytics].astype(str).apply(
                 lambda x: f'0{x}' if len(x) == 1 and self.is_accounting_code(x) else x)
             
             # запишем таблицу в словарь
@@ -204,7 +207,7 @@ class IFileProcessor:
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
             register = self.dict_df[file].register
-            register_filds = getattr(register, sign_1c)
+            register_fields = getattr(register, sign_1c)
            
             # Инициализация переменной для хранения предыдущего значения
             prev_value = None
@@ -214,14 +217,15 @@ class IFileProcessor:
         
             # разнесем уровни в горизонтальную ориентацию в цикле
             for i in range(max_level + 1):
-                df[f'Level_{i}'] = df.apply(lambda x: self.fill_level(x, prev_value, i, register_filds.analytics), axis=1)
+                df[f'Level_{i}'] = df.apply(lambda x: self.fill_level(x, prev_value, i, register_fields.analytics), axis=1)
                 for j, row in df.iterrows():
+                    previous_index = df.index[df.index.get_loc(j) - 1]
                     if row['Уровень'] == i:
-                        prev_value = row[register_filds.analytics]
+                        prev_value = row[register_fields.analytics]
                         if prev_value == 'Количество':
-                            prev_value = df.at[j-1, register_filds.analytics]
+                            prev_value = df.loc[previous_index, register_fields.analytics]
                     df.at[j, f'Level_{i}'] = prev_value
-                    
+
             # запишем таблицу в словарь
             self.dict_df[file].table = df
             
@@ -236,9 +240,9 @@ class IFileProcessor:
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
             register = self.dict_df[file].register
-            register_filds = getattr(register, sign_1c)
+            register_fields = getattr(register, sign_1c)
 
-            df[register_filds.analytics] = df[register_filds.analytics].astype(str)
+            df[register_fields.analytics] = df[register_fields.analytics].astype(str)
             
             # Определяем желаемый порядок столбцов
             desired_order = [
@@ -265,26 +269,26 @@ class IFileProcessor:
             desired_order.append('Кредит_конец')
             desired_order = [col for col in desired_order if col in df.columns]
         
-            if sign_1c == 'upp' and df[register_filds.analytics].isin(['Количество']).any():
+            if sign_1c == 'upp' and df[register_fields.analytics].isin(['Количество']).any():
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
-            elif sign_1c == 'notupp' and register_filds.quantity:
+            elif sign_1c == 'notupp' and register_fields.quantity:
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
         
             max_level = df['Уровень'].max()
             
-            df = df[~df[register_filds.analytics].str.contains('Итого')]
-            df = df[~df[register_filds.analytics].str.contains('Количество')]
-            if register_filds.quantity in df.columns:
-                df = df[~df[register_filds.quantity].str.contains('Кол.', na=False)]
-                df = df.drop([register_filds.quantity], axis=1)
+            df = df[~df[register_fields.analytics].str.contains('Итого')]
+            df = df[~df[register_fields.analytics].str.contains('Количество')]
+            if register_fields.quantity in df.columns:
+                df = df[~df[register_fields.quantity].str.contains('Кол.', na=False)]
+                df = df.drop([register_fields.quantity], axis=1)
             
             for i in range(max_level):
-                df = df[~((df['Уровень']==i) & (df[register_filds.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
+                df = df[~((df['Уровень']==i) & (df[register_fields.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
         
-            df = df[~df[register_filds.analytics].isin(exclude_values)].copy()
-            df[register_filds.analytics] = df[register_filds.analytics].astype(str)
+            df = df[~df[register_fields.analytics].isin(exclude_values)].copy()
+            df[register_fields.analytics] = df[register_fields.analytics].astype(str)
         
             # Список необходимых столбцов
             required_columns = ['Дебет_начало', 'Кредит_начало', 'Дебет_оборот', 'Кредит_оборот', 'Дебет_конец', 'Кредит_конец']
@@ -298,10 +302,6 @@ class IFileProcessor:
             
             # запишем таблицу в словарь
             self.dict_df[file].table = df
-        # список проблемных файлов и проч удалить потом
-        # for i in self.dict_df:
-        #     self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
-        # print('empty_files', self.empty_files)
     
     def joining_tables(self) -> None:
         list_tables_for_joining = [self.dict_df[i].table for i in self.dict_df]
@@ -387,8 +387,8 @@ class IFileProcessor:
     def unloading_pivot_table(self) -> None:
         self.pivot_table.to_excel('Сводная_таблица.xlsx', index=False)
             
-    
-    def process_end(self) -> None:
+    @staticmethod
+    def process_end() -> None:
         print('Закончили обработку')
 
 class AccountTurnoverProcessor(IFileProcessor):
@@ -398,29 +398,41 @@ class AccountTurnoverProcessor(IFileProcessor):
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
             indices_to_rename: List[int] = []
-            filds_account_turnover = getattr(turnover_filds, sign_1c)
+            fields_account_turnover = getattr(turnover_fields, sign_1c)
             
             df = df.loc[:, df.columns.notna()]
             df.columns = df.columns.astype(str)
             
-            for turnover_type in filds_account_turnover:
+            for turnover_type in fields_account_turnover:
                 try:
-                    name_atribute = turnover_filds.get_inner_attribute_by_value(turnover_type)
+                    name_attribute = turnover_fields.get_inner_attribute_name_by_value(turnover_type)
                     index_turnover_type: int or False = df.columns.get_loc(turnover_type) if turnover_type in df.columns else False
-                    self.dict_df[file].set_index_column(name_atribute, index_turnover_type)
-                    if ('debit' in name_atribute) or ('credit' in name_atribute) and index_turnover_type:
+                    self.dict_df[file].set_index_column(name_attribute, index_turnover_type)
+                    if ('debit' in name_attribute) or ('credit' in name_attribute) and index_turnover_type:
                         indices_to_rename.append(index_turnover_type)
                 except TypeError:
                     continue # Пропускаем, если turnover_type == None
                 except StopIteration:
                     continue  # Если ничего не найдено
 
-            if filds_account_turnover.debit_turnover in df.columns:
+            match fields_account_turnover.analytics:
+                case 'Субконто':
+                    end_debit_balance_index: int = 8 if fields_account_turnover.type_connection else 5
+                    end_credit_balance_index: int = 9 if fields_account_turnover.type_connection else 6
+                    credit_turnover_index: int = 7 if fields_account_turnover.type_connection else 4
+                case 'Счет':
+                    end_debit_balance_index: int = 6 if fields_account_turnover.quantity else 5
+                    end_credit_balance_index: int = 7 if fields_account_turnover.quantity else 6
+                    credit_turnover_index: int = 5 if fields_account_turnover.quantity else 4
+                case _:
+                    raise NoExcelFilesError
+
+            if fields_account_turnover.debit_turnover in df.columns:
                 # Определяем верхнюю границу для добавления префикса 'до'
                 debit_turnover_index: int = getattr(self.dict_df[file], 'index_column_debit_turnover', None)
-                credit_turnover_index: int = getattr(self.dict_df[file], 'index_column_credit_turnover', None)
-                end_debit_balance_index: int = getattr(self.dict_df[file], 'index_column_end_debit_balance', None)
-                end_credit_balance_index: int = getattr(self.dict_df[file], 'index_column_end_credit_balance', None)
+                credit_turnover_index = getattr(self.dict_df[file], 'index_column_credit_turnover', None)
+                end_debit_balance_index = getattr(self.dict_df[file], 'index_column_end_debit_balance', None)
+                end_credit_balance_index = getattr(self.dict_df[file], 'index_column_end_credit_balance', None)
                 upper_bound_index: int = credit_turnover_index or end_debit_balance_index or end_credit_balance_index
             
                 # Создаем новый список названий столбцов с префиксом 'до'
@@ -434,7 +446,7 @@ class AccountTurnoverProcessor(IFileProcessor):
                 # Обновляем названия столбцов в DataFrame
                 df.columns = list_do_columns
             
-            if filds_account_turnover.credit_turnover in df.columns:
+            if fields_account_turnover.credit_turnover in df.columns:
                 list_ko_columns: List[str] = []
                 
                 # Определяем границы для добавления префикса 'ко'
@@ -501,49 +513,46 @@ class AccountOSVProcessor(IFileProcessor):
             self.dict_df[file].table = df
         
             
-class AccountAnalisysProcessor(IFileProcessor):
+class AccountAnalysisProcessor(IFileProcessor):
     def handle_missing_values(self):
         for file in self.dict_df:
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
-            register_filds = getattr(analisys_filds, sign_1c)
+            register_fields = getattr(analysis_fields, sign_1c)
             
             
             
             # сохраним столбец "Вид связи КА" в отдельный фрейм
             # чтобы в методе lines_delete проставить пропущенные значения "Вид связи КА"
-            if register_filds.type_connection in df.columns:
+            if register_fields.type_connection in df.columns:
                 df_type_connection = (
                         df
-                        .drop_duplicates(subset=[register_filds.analytics, register_filds.type_connection])
-                        .dropna(subset=[register_filds.analytics, register_filds.type_connection])  # Удаляем строки с NaN в указаных столбцах
-                        .loc[:, [register_filds.analytics, register_filds.type_connection]]
+                        .drop_duplicates(subset=[register_fields.analytics, register_fields.type_connection])
+                        .dropna(subset=[register_fields.analytics, register_fields.type_connection])  # Удаляем строки с NaN в указанных столбцах
+                        .loc[:, [register_fields.analytics, register_fields.type_connection]]
                     )
                 self.dict_df[file].table_type_connection = df_type_connection
 
             # Проверка на пропуски и условия для заполнения
             mask = (
-                df[register_filds.analytics].isna() &
-                ~df[register_filds.corresponding_account].apply(self.is_accounting_code) &
-                ~df[register_filds.corresponding_account].isin(['Кол-во:']) &
-                df[register_filds.corresponding_account].isin(exclude_values))
+                df[register_fields.analytics].isna() &
+                ~df[register_fields.corresponding_account].apply(self.is_accounting_code) &
+                ~df[register_fields.corresponding_account].isin(['Кол-во:']) &
+                df[register_fields.corresponding_account].isin(exclude_values))
             
             # Заполнение пропусков
-            df[register_filds.analytics] = np.where(mask, 'Не_заполнено', df[register_filds.analytics])
+            df[register_fields.analytics] = np.where(mask, 'Не_заполнено', df[register_fields.analytics])
             
             # Заполнение последними непустыми значениями
-            df[register_filds.analytics] = df[register_filds.analytics].ffill()
+            df[register_fields.analytics] = df[register_fields.analytics].ffill()
             
             # Приведение к строковому типу
-            df[register_filds.analytics] = df[register_filds.analytics].astype(str)
+            df[register_fields.analytics] = df[register_fields.analytics].astype(str)
             
             # Добавление '0' к счетам до 10
-            df[register_filds.analytics] = df[register_filds.analytics].apply(
+            df[register_fields.analytics] = df[register_fields.analytics].apply(
                 lambda x: f'0{x}' if (len(x) == 1 and self.is_accounting_code(x)) else x)
-            
-            
-            
-            
+
             # Запишем таблицу в словарь
             self.dict_df[file].table = df
     
@@ -551,10 +560,10 @@ class AccountAnalisysProcessor(IFileProcessor):
         for file in self.dict_df:
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
-            register_filds = getattr(analisys_filds, sign_1c)
+            register_fields = getattr(analysis_fields, sign_1c)
         
             # добавим столбец корр.счет, взяв его из основного столбца, при условии, что значение - бухгалтерских счет (функция is_accounting_code)
-            df['Корр_счет'] = df[register_filds.corresponding_account].apply(lambda x: str(x) if (self.is_accounting_code(x) or str(x) == '0') else None)
+            df['Корр_счет'] = df[register_fields.corresponding_account].apply(lambda x: str(x) if (self.is_accounting_code(x) or str(x) == '0') else None)
             
             # добавим нолик, если счет до 10, чтобы было 01 02 04 05 07 08 09
             df['Корр_счет'] = df['Корр_счет'].apply(lambda x: f'0{x}' if len(str(x)) == 1 else x)
@@ -567,22 +576,18 @@ class AccountAnalisysProcessor(IFileProcessor):
             
             # Запишем таблицу в словарь
             self.dict_df[file].table = df
-            
-        # список проблемных файлов и проч удалить потом
-        # for i in self.dict_df:
-        #     self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
-        # print('empty_files', self.empty_files)
+
         
     def lines_delete(self):
         
         for file in self.dict_df:
             df = self.dict_df[file].table
             sign_1c = self.dict_df[file].sign_1C
-            register_filds = getattr(analisys_filds, sign_1c)
-            df_delete = df[~df[register_filds.corresponding_account].isin(exclude_values)]
-            df_delete = df_delete.dropna(subset=[register_filds.corresponding_account]).copy()
-            df_delete = df_delete[df_delete['Курсив'] == 0][[register_filds.corresponding_account, 'Корр_счет']]
-            unique_df = df_delete.drop_duplicates(subset=[register_filds.corresponding_account, 'Корр_счет'])
+            register_fields = getattr(analysis_fields, sign_1c)
+            df_delete = df[~df[register_fields.corresponding_account].isin(exclude_values)]
+            df_delete = df_delete.dropna(subset=[register_fields.corresponding_account]).copy()
+            df_delete = df_delete[df_delete['Курсив'] == 0][[register_fields.corresponding_account, 'Корр_счет']]
+            unique_df = df_delete.drop_duplicates(subset=[register_fields.corresponding_account, 'Корр_счет'])
             unique_df = unique_df[~unique_df['Корр_счет'].isin([None])]
         
             all_acc_dict = {}
@@ -612,40 +617,40 @@ class AccountAnalisysProcessor(IFileProcessor):
                 del_acc_with_94 = [i for i in acc_with_94 if i !='94.Н']
             del_acc = list(set(del_acc + del_acc_with_94))
             
-            for i in acc_out_subacc:
+            for i in accounts_without_subaccount:
                 unwanted_subaccounts = [n for n in all_acc_dict if i in n]
                 del_unwanted_subaccounts = [n for n in unwanted_subaccounts if n !=i]
                 del_acc = list(set(del_acc + del_unwanted_subaccounts))
         
-            for i in acc_out_subacc:
+            for i in accounts_without_subaccount:
                 if i in del_acc:
                     del_acc.remove(i)
             
-            df[register_filds.corresponding_account] = df[register_filds.corresponding_account].apply(lambda x: str(x))
+            df[register_fields.corresponding_account] = df[register_fields.corresponding_account].apply(lambda x: str(x))
     
         
             values_with_quantity = False
-            if (df[register_filds.corresponding_account].isin(['Кол-во:']).any()
-                or register_filds.quantity in df.columns):
+            if (df[register_fields.corresponding_account].isin(['Кол-во:']).any()
+                or register_fields.quantity in df.columns):
 
-                df['С кред. счетов_КОЛ'] = df[register_filds.debit_turnover].shift(-1)
-                df['В дебет счетов_КОЛ'] = df[register_filds.credit_turnover].shift(-1)
-                if register_filds.quantity in df.columns:
-                    df = df[df[register_filds.quantity] != 'Кол.'].copy()
+                df['С кред. счетов_КОЛ'] = df[register_fields.debit_turnover].shift(-1)
+                df['В дебет счетов_КОЛ'] = df[register_fields.credit_turnover].shift(-1)
+                if register_fields.quantity in df.columns:
+                    df = df[df[register_fields.quantity] != 'Кол.'].copy()
                 values_with_quantity = True
             
             # Заполняем пропущенные значения в столбце Вид_связи    
-            if register_filds.type_connection in df.columns:
-                merged = df.merge(self.dict_df[file].table_type_connection, on=register_filds.analytics, how='left', suffixes=('', '_B'))
-                df[register_filds.type_connection] = df[register_filds.type_connection].fillna(merged[f'{register_filds.type_connection}_B'])
+            if register_fields.type_connection in df.columns:
+                merged = df.merge(self.dict_df[file].table_type_connection, on=register_fields.analytics, how='left', suffixes=('', '_B'))
+                df[register_fields.type_connection] = df[register_fields.type_connection].fillna(merged[f'{register_fields.type_connection}_B'])
 
             df = df[
-                ~df[register_filds.corresponding_account].isin(exclude_values) &  # Исключение определенных значений (Сальдо, Оборот и т.д.)
-                ~df[register_filds.corresponding_account].isin(del_acc) # Исключение счетов, по которым есть расшифровка субконто (60, 60.01 и т.д.)
+                ~df[register_fields.corresponding_account].isin(exclude_values) &  # Исключение определенных значений (Сальдо, Оборот и т.д.)
+                ~df[register_fields.corresponding_account].isin(del_acc) # Исключение счетов, по которым есть расшифровка субконто (60, 60.01 и т.д.)
                 ].copy()
             
             df = df[df['Курсив'] == 0].copy()
-            df[register_filds.corresponding_account] = df[register_filds.corresponding_account].astype(str)
+            df[register_fields.corresponding_account] = df[register_fields.corresponding_account].astype(str)
         
         
             shiftable_level = 'Level_0'
@@ -661,10 +666,10 @@ class AccountAnalisysProcessor(IFileProcessor):
             df['Субсчет'] = df.apply(
                 lambda row: 'Без_субсчетов' if not self.is_accounting_code(row['Субсчет']) else row['Субсчет'], axis=1)
             
-            df = df.rename(columns={register_filds.corresponding_account: 'Субконто_корр_счета',
-                                    register_filds.analytics: 'Аналитика',
-                                    register_filds.debit_turnover: 'С кред. счетов',
-                                    register_filds.credit_turnover: 'В дебет счетов'})
+            df = df.rename(columns={register_fields.corresponding_account: 'Субконто_корр_счета',
+                                    register_fields.analytics: 'Аналитика',
+                                    register_fields.debit_turnover: 'С кред. счетов',
+                                    register_fields.credit_turnover: 'В дебет счетов'})
         
             # Указываем желаемый порядок для известных столбцов
             desired_order = ['Исх.файл',
@@ -708,11 +713,7 @@ class AccountAnalisysProcessor(IFileProcessor):
             
             # Запишем таблицу в словарь
             self.dict_df[file].table = df
-            
-        # список проблемных файлов и проч удалить потом
-        # for i in self.dict_df:
-        #     self.dict_df[i].table.to_excel(f'{i}_обраб.xlsx')
-        # print('empty_files', self.empty_files)
+
         
     def rename_columns(self) -> None:
         list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]

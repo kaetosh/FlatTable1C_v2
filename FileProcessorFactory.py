@@ -5,7 +5,7 @@ Created on Mon Dec 16 14:40:14 2024
 @author: a.karabedyan
 """
 
-from FileProcessor import IFileProcessor, AccountTurnoverProcessor, AccountAnalisysProcessor, AccountOSVProcessor
+from FileProcessor import IFileProcessor, AccountTurnoverProcessor, AccountAnalysisProcessor, AccountOSVProcessor
 
 class FileProcessorFactory:
     @staticmethod
@@ -13,8 +13,8 @@ class FileProcessorFactory:
         match file_type:
             case "account_turnover":
                 return AccountTurnoverProcessor(file_type)
-            case "account_analisys":
-                return AccountAnalisysProcessor(file_type)
+            case "account_analysis":
+                return AccountAnalysisProcessor(file_type)
             case "account_osv":
                 return AccountOSVProcessor(file_type)
             case _:

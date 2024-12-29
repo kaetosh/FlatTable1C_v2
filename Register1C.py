@@ -2,25 +2,39 @@
 """
 Created on Mon Dec 16 15:26:33 2024
 
-@author: a.karabedyan
+@author: kaetosh
+
+В работе три основных регистра из 1С:
+- ОСВ
+- Обороты счета
+- Анализ счета
+
+Классы помогают идентифицировать эти регистры по их полям, их названия отличаются для версий 1С:Предприятие 8.3:
+1. Конфигурация "Бухгалтерия предприятия",
+   Конфигурация "1С:ERP Агропромышленный комплекс",
+   Конфигурация "1С:ERP Управление предприятием 2" (признак в коде 'notupp')
+2. Конфигурация "Управление производственным предприятием" (признак в коде 'upp')
+
+Экземпляры данных классов определены в config.py
 """
 
-from dataclasses import dataclass
+from typing import Optional
+from dataclasses import dataclass, field
 import pandas as pd
 
 # поля регистров 1с
 class FieldsRegister:
     def __init__(self,
-                 analytics: str or None = None,
-                 quantity: str or None = None,
-                 type_connection: str or None = None,
-                 corresponding_account: str or None = None,
-                 start_debit_balance: str or None = None,
-                 start_credit_balance: str or None = None, 
-                 debit_turnover: str or None = None,
-                 credit_turnover: str or None = None, 
-                 end_debit_balance: str or None = None,
-                 end_credit_balance: str or None = None):
+                 analytics: Optional[str] = None,
+                 quantity: Optional[str] = None,
+                 type_connection: Optional[str] = None,
+                 corresponding_account: Optional[str] = None,
+                 start_debit_balance: Optional[str] = None,
+                 start_credit_balance: Optional[str] = None,
+                 debit_turnover: Optional[str] = None,
+                 credit_turnover: Optional[str] = None,
+                 end_debit_balance: Optional[str] = None,
+                 end_credit_balance: Optional[str] = None):
         self.analytics = analytics
         self.quantity = quantity
         self.type_connection = type_connection
@@ -43,28 +57,27 @@ class FieldsRegister:
                      self.end_debit_balance,
                      self.end_credit_balance))
 
-class Register_1C:
+class Register1c:
     def __init__(self,
-                 name_register: str or None,
-                 upp: FieldsRegister or None = None,
-                 notupp: FieldsRegister or None = None):
+                 name_register: Optional[str],
+                 upp: Optional[FieldsRegister] = None,
+                 notupp: Optional[FieldsRegister] = None):
         self.name_register = name_register
         self.upp = upp if upp is not None else []
         self.notupp = notupp if notupp is not None else []
-    def get_attribute_name_by_value(self, value):
+    def get_outer_attribute_name_by_value(self, value):
         """
-        Метод, который ищет атрибут внешнего класса Register_1C по значению
+        Метод, который ищет атрибут внешнего класса Register1c по значению
         атрибута внутреннего класса FieldsRegister
         (признак версии 1С: УПП или нет).
         """
         for attr_name, attr_value in vars(self).items():
             if isinstance(attr_value, FieldsRegister):
-                # Проходим по всем атрибутам FieldsRegister
                 for inner_attr_name, inner_attr_value in vars(attr_value).items():
                     if inner_attr_value == value:
                         return attr_name  # Возвращаем имя внешнего атрибута
         return None  # Если значение не найдено
-    def get_inner_attribute_by_value(self, value):
+    def get_inner_attribute_name_by_value(self, value):
         """
         Метод, который ищет атрибут внутреннего класса FieldsRegister по значению
         атрибута внутреннего класса FieldsRegister.
@@ -78,19 +91,28 @@ class Register_1C:
     def __iter__(self):
         yield from self.upp
         yield from self.notupp
-    
     def __str__(self):
-        return(f'{self.name_register}')
+        return self.name_register
 
+"""
+На каждом этапе обработки таблицы записываются в данном классе.
+table - обрабатываемая таблица (регистра 1С)
+register - поля регистра 1С
+sign_1C - Признак 1С - УПП ('upp' в коде) или не УПП ('notupp' в коде)
+table_type_connection - вспомогательная таблица Субконто - Вид связи контрагента,
+    используется для заполнения пропущенных значений по полю Вид связи контрагента
+    в регистрах УПП
+"""
 @dataclass
-class Table_storage:
+class TableStorage:
     table: pd.DataFrame
-    register: Register_1C
+    register: Register1c
     sign_1C: str
-    table_type_connection: pd.DataFrame = None
-
-    def set_index_column(self, name_atribure, value):
-        # Формируем имя атрибута
-        attr_name = f'index_column_{name_atribure}'
-        # Устанавливаем значение атрибута
+    table_type_connection: pd.DataFrame = field(default=None)
+    def set_index_column(self, name_attribute: str, value):
+        """
+        В регистре Обороты счета наименования столбцов с оборотами с корреспондирующими счетам
+        не разделены по дебетовые и кредитовые. Метод записывает их индексы для разделения.
+        """
+        attr_name = f'index_column_{name_attribute}'
         setattr(self, attr_name, value)

@@ -8,7 +8,7 @@ Created on Mon Dec 16 14:42:39 2024
 from FileProcessorFactory import FileProcessorFactory
 
 def main():
-    file_type = ['account_turnover', 'account_analisys', 'account_osv']
+    file_type = ['account_turnover', 'account_analysis', 'account_osv']
     processor = FileProcessorFactory.create_processor(file_type[1])
     processor.conversion_preprocessing()
     processor.general_table_header()
