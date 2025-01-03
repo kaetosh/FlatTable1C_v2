@@ -9,14 +9,16 @@ from FileProcessorFactory import FileProcessorFactory
 
 def main():
     file_type = ['account_turnover', 'account_analysis', 'account_osv']
-    processor = FileProcessorFactory.create_processor(file_type[1])
+    processor = FileProcessorFactory.create_processor(file_type[2])
     processor.conversion_preprocessing()
     processor.general_table_header()
     processor.special_table_header()
     processor.handle_missing_values()
     processor.horizontal_structure()
     processor.corr_account_col()
+    processor.revolutions_before_processing()
     processor.lines_delete()
+    processor.revolutions_after_processing()
     processor.joining_tables()
     processor.shiftable_level()
     processor.rename_columns()

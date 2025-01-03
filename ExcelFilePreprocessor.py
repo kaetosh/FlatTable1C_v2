@@ -16,11 +16,9 @@ import openpyxl
 from config import analysis_fields
 
 class ExcelFilePreprocessor:
-    def __init__(self, excel_files, file_type):
-        self.excel_files = excel_files
-        self.file_type = file_type
-    def preprocessor_openpyxl(self):
-        for oFile in self.excel_files:
+    @staticmethod
+    def preprocessor_openpyxl(excel_files, file_type):
+        for oFile in excel_files:
             workbook = None
             try:
                 workbook = openpyxl.load_workbook(oFile)
@@ -40,7 +38,7 @@ class ExcelFilePreprocessor:
                 cell = sheet.cell(row=row_index, column=1)
                 cell.value = sheet.row_dimensions[row_index].outline_level
             # Столбец с признаком курсива
-            if self.file_type == 'account_analysis':
+            if file_type == 'account_analysis':
                 sheet.insert_cols(idx=2)
                 for row in sheet.iter_rows(values_only=True):
                     found_value = next((value for value in [analysis_fields.upp.corresponding_account,

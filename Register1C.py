@@ -108,7 +108,9 @@ class TableStorage:
     table: pd.DataFrame
     register: Register1c
     sign_1C: str
+    sign_1C: str
     table_type_connection: pd.DataFrame = field(default=None)
+    table_for_check: pd.DataFrame = field(default=None)
     def set_index_column(self, name_attribute: str, value):
         """
         В регистре Обороты счета наименования столбцов с оборотами с корреспондирующими счетам
