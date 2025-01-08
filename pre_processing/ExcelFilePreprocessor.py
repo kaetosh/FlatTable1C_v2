@@ -11,13 +11,17 @@ Created on Mon Dec 16 16:35:32 2024
 - добавление столбца с признаком курсивного шрифта (актуально для анализа счета в УПП, строки с курсивом
 это промежуточные итоги, для исключения в сводном файле)
 """
-
+from typing import Literal, List
 import openpyxl
+from pathlib import Path
 from config import analysis_fields
 
 class ExcelFilePreprocessor:
     @staticmethod
-    def preprocessor_openpyxl(excel_files, file_type):
+    def preprocessor_openpyxl(excel_files: List[Path],
+                              file_type: Literal['account_turnover',
+                                                 'account_analysis',
+                                                 'account_osv']) -> None:
         for oFile in excel_files:
             workbook = None
             try:

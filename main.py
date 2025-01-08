@@ -5,7 +5,7 @@ Created on Mon Dec 16 14:42:39 2024
 @author: a.karabedyan
 """
 
-from FileProcessorFactory import FileProcessorFactory
+from basic_processing.FileProcessorFactory import FileProcessorFactory
 
 def main():
     file_type = ['account_turnover', 'account_analysis', 'account_osv']

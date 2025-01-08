@@ -1,9 +1,4 @@
-# -*- coding: utf-8 -*-
 """
-Created on Mon Dec 16 15:26:33 2024
-
-@author: kaetosh
-
 В работе три основных регистра из 1С:
 - ОСВ
 - Обороты счета
@@ -17,24 +12,34 @@ Created on Mon Dec 16 15:26:33 2024
 
 Экземпляры данных классов определены в config.py
 """
-
-from typing import Optional
+import inspect
+from enum import Enum
+from typing import Optional, Literal, Type, List, cast
 from dataclasses import dataclass, field
 import pandas as pd
+from additional.ErrorClasses import NoExcelFilesError
+
+def _get_class_attributes(cl: Type) -> List[str]:
+    """
+    Возвращает атрибуты класса (не экземпляра)
+    """
+    init_signature = inspect.signature(cl.__init__)
+    return [i for i in init_signature.parameters if i != 'self']
 
 # поля регистров 1с
 class FieldsRegister:
     def __init__(self,
-                 analytics: Optional[str] = None,
-                 quantity: Optional[str] = None,
-                 type_connection: Optional[str] = None,
-                 corresponding_account: Optional[str] = None,
-                 start_debit_balance: Optional[str] = None,
-                 start_credit_balance: Optional[str] = None,
-                 debit_turnover: Optional[str] = None,
-                 credit_turnover: Optional[str] = None,
-                 end_debit_balance: Optional[str] = None,
-                 end_credit_balance: Optional[str] = None):
+                 analytics: Optional[str] = None, # субконто счета
+                 quantity: Optional[str] = None, # количество
+                 type_connection: Optional[str] = None, # вид связи контрагента (признак компании группы)
+                 corresponding_account: Optional[str] = None, # корреспондирующий счет
+                 start_debit_balance: Optional[str] = None, # входящий дебетовый остаток
+                 start_credit_balance: Optional[str] = None, # входящий кредитовый остаток
+                 debit_turnover: Optional[str] = None, # дебетовый оборот
+                 credit_turnover: Optional[str] = None, # кредитовый оборот
+                 end_debit_balance: Optional[str] = None, # исходящий дебетовый остаток
+                 end_credit_balance: Optional[str] = None, # исходящий кредитовый остаток
+                 version_1c_id: Optional[str] = None): # поле для различения версии 1С (для осв и оборотов совпадает с параметром analytics, анализа счета - corresponding_account)
         self.analytics = analytics
         self.quantity = quantity
         self.type_connection = type_connection
@@ -45,6 +50,7 @@ class FieldsRegister:
         self.credit_turnover = credit_turnover
         self.end_debit_balance = end_debit_balance
         self.end_credit_balance = end_credit_balance
+        self.version_1c_id = version_1c_id
     def __iter__(self):
         return iter((self.analytics,
                      self.quantity,
@@ -55,17 +61,22 @@ class FieldsRegister:
                      self.debit_turnover,
                      self.credit_turnover,
                      self.end_debit_balance,
-                     self.end_credit_balance))
+                     self.end_credit_balance,
+                     self.version_1c_id))
+
+# перечисление аттрибутов FieldsRegister для аннотации метода get_inner_attribute_name_by_value()
+list_of_attributes_FieldsRegister = Enum('list_of_attributes_FieldsRegister',
+                                         _get_class_attributes(FieldsRegister))
 
 class Register1c:
     def __init__(self,
-                 name_register: Optional[str],
-                 upp: Optional[FieldsRegister] = None,
-                 notupp: Optional[FieldsRegister] = None):
+                 name_register: Optional[str], # осв, обороты счета или анализ счета
+                 upp: Optional[FieldsRegister] = None, # поля регистра из 1С УПП
+                 notupp: Optional[FieldsRegister] = None): # поля регистра из 1С прочих версий
         self.name_register = name_register
         self.upp = upp if upp is not None else []
         self.notupp = notupp if notupp is not None else []
-    def get_outer_attribute_name_by_value(self, value):
+    def get_outer_attribute_name_by_value(self, value: str) -> Literal["upp", "notupp"]:
         """
         Метод, который ищет атрибут внешнего класса Register1c по значению
         атрибута внутреннего класса FieldsRegister
@@ -74,10 +85,10 @@ class Register1c:
         for attr_name, attr_value in vars(self).items():
             if isinstance(attr_value, FieldsRegister):
                 for inner_attr_name, inner_attr_value in vars(attr_value).items():
-                    if inner_attr_value == value:
-                        return attr_name  # Возвращаем имя внешнего атрибута
-        return None  # Если значение не найдено
-    def get_inner_attribute_name_by_value(self, value):
+                    if inner_attr_value == value and attr_name in ["upp", "notupp"]:
+                        return cast(Literal["upp", "notupp"], attr_name)
+        raise NoExcelFilesError
+    def get_inner_attribute_name_by_value(self, value: str) -> list_of_attributes_FieldsRegister:
         """
         Метод, который ищет атрибут внутреннего класса FieldsRegister по значению
         атрибута внутреннего класса FieldsRegister.
@@ -85,9 +96,9 @@ class Register1c:
         for attr_value in (self.upp, self.notupp):
             if isinstance(attr_value, FieldsRegister):
                 for inner_attr_name, inner_attr_value in vars(attr_value).items():
-                    if inner_attr_value == value:
-                        return inner_attr_name  # Возвращаем имя атрибута внутреннего класса
-        return None  # Если значение не найдено
+                    if inner_attr_value == value and inner_attr_value in [i.name for i in list_of_attributes_FieldsRegister]:
+                        return cast(list_of_attributes_FieldsRegister, inner_attr_name)
+        raise NoExcelFilesError
     def __iter__(self):
         yield from self.upp
         yield from self.notupp
@@ -107,14 +118,14 @@ table_type_connection - вспомогательная таблица Субко
 class TableStorage:
     table: pd.DataFrame
     register: Register1c
-    sign_1C: str
-    sign_1C: str
+    sign_1C: Literal["upp", "notupp"]
     table_type_connection: pd.DataFrame = field(default=None)
     table_for_check: pd.DataFrame = field(default=None)
-    def set_index_column(self, name_attribute: str, value):
+    def set_index_column(self, name_attribute: str, value: int) -> None:
         """
         В регистре Обороты счета наименования столбцов с оборотами с корреспондирующими счетам
-        не разделены по дебетовые и кредитовые. Метод записывает их индексы для разделения.
+        не разделены по дебетовые и кредитовые (один и тот же счет может быть и по Дт, и по Кт).
+        Метод записывает их индексы для разделения.
         """
         attr_name = f'index_column_{name_attribute}'
         setattr(self, attr_name, value)

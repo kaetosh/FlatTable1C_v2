@@ -15,14 +15,13 @@ Excel-файл по своей сути — это архив данных, ко
 имя которого начинается с нижнего регистра.
 """
 import os
-
-
 import win32com.client
-
+from typing import List
+from pathlib import Path
 
 class ExcelFileConverter:
     @staticmethod
-    def save_as_xlsx_no_alert(excel_files):
+    def save_as_xlsx_no_alert(excel_files: List[Path]) -> None:
         excel_app = win32com.client.Dispatch('Excel.Application')
         excel_app.Visible = False
         excel_app.DisplayAlerts = False
@@ -30,7 +29,7 @@ class ExcelFileConverter:
             ExcelFileConverter.convert_file(excel_app, file)
         excel_app.Quit()
     @staticmethod
-    def convert_file(excel_app, file):
+    def convert_file(excel_app: win32com.client.CDispatch, file: Path) -> None:
         name_xlsx = str(file).replace('.xls', '.xlsx') if str(file).endswith('.xls') else str(file)
         wb = excel_app.Workbooks.Open(str(file))
         wb.SaveAs(name_xlsx, FileFormat=51)  # Сохраняем под тем же именем, меняя формат
