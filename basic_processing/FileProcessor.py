@@ -292,14 +292,18 @@ class IFileProcessor:
         pass
 
     def revolutions_before_processing(self) -> None:
+        """
+        Сохраняет в хранилище таблиц данные по оборотам до обработки, чтобы в дальнейшем
+        сравнить их с данными по оборотам после обработки с целью убедиться в корректности обработки
+        """
         for file in self.dict_df:
             df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
             existing_columns = [i for i in df.columns if i in register_fields.get_rename_attributes()]
 
-            if df[df[register_fields.analytics] == 'Итого'][existing_columns].empty:
+            if df[df[register_fields.version_1c_id] == 'Итого'][existing_columns].empty:
                 raise NoExcelFilesError
             else:
-                df_for_check = df[df[register_fields.analytics] == 'Итого'][[register_fields.analytics] + existing_columns].copy().tail(2).iloc[[0]]
+                df_for_check = df[df[register_fields.version_1c_id] == 'Итого'][[register_fields.version_1c_id] + existing_columns].copy().tail(2).iloc[[0]]
 
                 # для новой версии pandas
                 # with pd.option_context("future.no_silent_downcasting", True):
@@ -513,20 +517,3 @@ class IFileProcessor:
     @staticmethod
     def process_end() -> None:
         print('Закончили обработку')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
