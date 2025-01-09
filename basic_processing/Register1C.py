@@ -51,6 +51,12 @@ class FieldsRegister:
         self.end_debit_balance = end_debit_balance
         self.end_credit_balance = end_credit_balance
         self.version_1c_id = version_1c_id
+        self.start_debit_balance_for_rename = 'Дебет_начало', # входящий дебетовый остаток для единообразия имен полей
+        self.start_credit_balance_for_rename = 'Кредит_начало', # входящий кредитовый остаток для единообразия имен полей
+        self.debit_turnover_for_rename = 'Дебет_оборот', # дебетовый оборот для единообразия имен полей
+        self.credit_turnover_for_rename = 'Кредит_оборот', # кредитовый оборот для единообразия имен полей
+        self.end_debit_balance_for_rename = 'Дебет_конец', # исходящий дебетовый остаток для единообразия имен полей
+        self.end_credit_balance_for_rename = 'Кредит_конец' # исходящий кредитовый остаток для единообразия имен полей
     def __iter__(self):
         return iter((self.analytics,
                      self.quantity,
@@ -63,6 +69,11 @@ class FieldsRegister:
                      self.end_debit_balance,
                      self.end_credit_balance,
                      self.version_1c_id))
+    def get_rename_attributes(self) -> List[str]:
+        """
+        Получить список новых имен полей чтобы переименовать шапку обрабатываемых таблиц
+        """
+        return [getattr(self, attr) for attr in dir(self) if attr.endswith('_for_rename')]
 
 # перечисление аттрибутов FieldsRegister для аннотации метода get_inner_attribute_name_by_value()
 list_of_attributes_FieldsRegister = Enum('list_of_attributes_FieldsRegister',
@@ -96,7 +107,7 @@ class Register1c:
         for attr_value in (self.upp, self.notupp):
             if isinstance(attr_value, FieldsRegister):
                 for inner_attr_name, inner_attr_value in vars(attr_value).items():
-                    if inner_attr_value == value and inner_attr_value in [i.name for i in list_of_attributes_FieldsRegister]:
+                    if inner_attr_value == value and inner_attr_name in [i.name for i in list_of_attributes_FieldsRegister]:
                         return cast(list_of_attributes_FieldsRegister, inner_attr_name)
         raise NoExcelFilesError
     def __iter__(self):
