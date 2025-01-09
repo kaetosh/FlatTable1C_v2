@@ -101,6 +101,9 @@ class AccountAnalysisProcessor(IFileProcessor):
                                                                  register_fields.credit_turnover]].sum().copy()
             df_for_check = df_for_check.reset_index()
 
+            df_for_check = df_for_check.rename(columns={register_fields.debit_turnover: 'С кред. счетов',
+                                                        register_fields.credit_turnover: 'В дебет счетов'})
+
             # запишем таблицу в словарь
             self.dict_df[file].table_for_check = df_for_check
 
@@ -124,7 +127,7 @@ class AccountAnalysisProcessor(IFileProcessor):
                     all_acc_dict[item] = 1
 
             # счета с субсчетами
-            acc_with_sub = [i for i in all_acc_dict if self.is_parent(i, all_acc_dict)]
+            acc_with_sub = [i for i in all_acc_dict if self._is_parent(i, all_acc_dict)]
 
             clean_acc = [i for i in all_acc_dict if i not in acc_with_sub]
             clean_acc = [i for i in clean_acc if all_acc_dict[i] == 1]
