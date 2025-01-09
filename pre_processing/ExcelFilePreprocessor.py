@@ -42,17 +42,17 @@ class ExcelFilePreprocessor:
                 cell = sheet.cell(row=row_index, column=1)
                 cell.value = sheet.row_dimensions[row_index].outline_level
             # Столбец с признаком курсива
-            if file_type == 'account_analysis':
-                sheet.insert_cols(idx=2)
-                for row in sheet.iter_rows(values_only=True):
-                    found_value = next((value for value in [analysis_fields.upp.corresponding_account,
-                                  analysis_fields.notupp.corresponding_account] if value in row), None)
-                    if found_value is not None:
-                        kor_schet_col_index = row.index(found_value) + 1  # Мы добавляем 1, потому что индексация начинается с 0
-                        for row_index in range(2, sheet.max_row + 1):  # Мы начинаем с цифры 2, чтобы пропустить название
-                            kor_schet_cell = sheet.cell(row=row_index, column=kor_schet_col_index)
-                            new_cell = sheet.cell(row=row_index, column=2)
-                            new_cell.value = 1 if kor_schet_cell.font and kor_schet_cell.font.italic else 0
-                        break
+            # if file_type == 'account_analysis':
+            sheet.insert_cols(idx=2)
+            for row in sheet.iter_rows(values_only=True):
+                found_value = next((value for value in [analysis_fields.upp.version_1c_id,
+                                                        analysis_fields.notupp.version_1c_id] if value in row), None)
+                if found_value is not None:
+                    kor_schet_col_index = row.index(found_value) + 1  # Мы добавляем 1, потому что индексация начинается с 0
+                    for row_index in range(2, sheet.max_row + 1):  # Мы начинаем с цифры 2, чтобы пропустить название
+                        kor_schet_cell = sheet.cell(row=row_index, column=kor_schet_col_index)
+                        new_cell = sheet.cell(row=row_index, column=2)
+                        new_cell.value = 1 if kor_schet_cell.font and kor_schet_cell.font.italic else 0
+                    break
             workbook.save(oFile)
             workbook.close()
