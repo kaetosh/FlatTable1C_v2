@@ -20,6 +20,7 @@ class AccountTurnoverProcessor(IFileProcessor):
 
             for turnover_type in fields_account_turnover:
                 try:
+                    print('turnover_type', turnover_type)
                     name_attribute = turnover_fields.get_inner_attribute_name_by_value(turnover_type)
                     index_turnover_type: int or False = df.columns.get_loc(
                         turnover_type) if turnover_type in df.columns else False
