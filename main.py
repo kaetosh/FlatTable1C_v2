@@ -9,8 +9,9 @@ from basic_processing.FileProcessorFactory import FileProcessorFactory
 
 def main():
     file_type = ['account_turnover', 'account_analysis', 'account_osv']
-    processor = FileProcessorFactory.create_processor(file_type[2])
-    processor.conversion_preprocessing()
+    processor = FileProcessorFactory.create_processor(file_type[1])
+    processor.conversion()
+    processor.preprocessing()
     processor.general_table_header()
     processor.special_table_header()
     processor.handle_missing_values()
