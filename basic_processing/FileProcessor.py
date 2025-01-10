@@ -309,10 +309,23 @@ class IFileProcessor:
                 # with pd.option_context("future.no_silent_downcasting", True):
                 #     df_for_check.loc[:, :] = df_for_check.fillna(0).infer_objects(copy=False)
 
+# new_names = ['Дебет_начало',
+#              'Кредит_начало',
+#              'Дебет_оборот',
+#              'Кредит_оборот',
+#              'Дебет_конец',
+#              'Кредит_конец']
+
                 df_for_check.loc[:, :] = df_for_check.fillna(0).infer_objects(copy=False)
-                df_for_check['Сальдо_начало_до_обработки'] = df_for_check[new_names[0]] - df_for_check[new_names[1]]
-                df_for_check['Сальдо_конец_до_обработки'] = df_for_check[new_names[4]] - df_for_check[new_names[5]]
-                df_for_check['Оборот_до_обработки'] = df_for_check[new_names[2]] - df_for_check[new_names[3]]
+
+                df_for_check['Сальдо_начало_до_обработки'] = (df_for_check[register_fields.start_debit_balance_for_rename]
+                                                              - df_for_check[register_fields.start_credit_balance_for_rename])
+
+                df_for_check['Сальдо_конец_до_обработки'] = (df_for_check[register_fields.end_debit_balance_for_rename]
+                                                             - df_for_check[register_fields.end_credit_balance_for_rename])
+
+                df_for_check['Оборот_до_обработки'] = (df_for_check[register_fields.debit_turnover_for_rename]
+                                                       - df_for_check[register_fields.credit_turnover_for_rename])
 
                 df_for_check = df_for_check[[
                     'Сальдо_начало_до_обработки',
