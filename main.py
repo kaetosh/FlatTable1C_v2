@@ -9,7 +9,7 @@ from basic_processing.FileProcessorFactory import FileProcessorFactory
 
 def main():
     file_type = ['account_turnover', 'account_analysis', 'account_osv']
-    processor = FileProcessorFactory.create_processor(file_type[1])
+    processor = FileProcessorFactory.create_processor(file_type[0])
     processor.conversion()
     processor.preprocessing()
     processor.general_table_header()
@@ -22,7 +22,7 @@ def main():
     processor.revolutions_after_processing()
     processor.joining_tables()
     processor.shiftable_level()
-    processor.rename_columns()
+    #processor.rename_columns()
     processor.unloading_pivot_table()
     processor.process_end()
 

@@ -51,12 +51,15 @@ class FieldsRegister:
         self.end_debit_balance = end_debit_balance
         self.end_credit_balance = end_credit_balance
         self.version_1c_id = version_1c_id
-        self.start_debit_balance_for_rename = 'Дебет_начало', # входящий дебетовый остаток для единообразия имен полей
-        self.start_credit_balance_for_rename = 'Кредит_начало', # входящий кредитовый остаток для единообразия имен полей
-        self.debit_turnover_for_rename = 'Дебет_оборот', # дебетовый оборот для единообразия имен полей
-        self.credit_turnover_for_rename = 'Кредит_оборот', # кредитовый оборот для единообразия имен полей
-        self.end_debit_balance_for_rename = 'Дебет_конец', # исходящий дебетовый остаток для единообразия имен полей
+        self.start_debit_balance_for_rename = 'Дебет_начало' # входящий дебетовый остаток для единообразия имен полей
+        self.start_credit_balance_for_rename = 'Кредит_начало' # входящий кредитовый остаток для единообразия имен полей
+        self.debit_turnover_for_rename = 'Дебет_оборот' # дебетовый оборот для единообразия имен полей
+        self.credit_turnover_for_rename = 'Кредит_оборот' # кредитовый оборот для единообразия имен полей
+        self.end_debit_balance_for_rename = 'Дебет_конец' # исходящий дебетовый остаток для единообразия имен полей
         self.end_credit_balance_for_rename = 'Кредит_конец' # исходящий кредитовый остаток для единообразия имен полей
+        self.start_balance_before_processing = 'Сальдо_начало_до_обработки'
+        self.turnover_before_processing = 'Оборот_до_обработки'
+        self.end_balance_before_processing = 'Сальдо_конец_до_обработки'
     def __iter__(self):
         return iter((self.analytics,
                      self.quantity,
@@ -69,11 +72,26 @@ class FieldsRegister:
                      self.end_debit_balance,
                      self.end_credit_balance,
                      self.version_1c_id))
-    def get_rename_attributes(self) -> List[str]:
+    def get_attributes_by_suffix(self, suffix: Literal['_before_processing',
+                                                       '_for_rename',
+                                                       '_after_processing']) -> List[str]:
         """
-        Получить список новых имен полей чтобы переименовать шапку обрабатываемых таблиц
+        Получить список имен полей по концовке имени аттрибута.
         """
-        return [getattr(self, attr) for attr in dir(self) if attr.endswith('_for_rename')]
+        attributes = [
+            'start_debit_balance_for_rename',
+            'start_credit_balance_for_rename',
+            'debit_turnover_for_rename',
+            'credit_turnover_for_rename',
+            'end_debit_balance_for_rename',
+            'end_credit_balance_for_rename',
+            'start_balance_before_processing',
+            'turnover_before_processing',
+            'end_balance_before_processing'
+        ]
+        #return [getattr(self, attr) for attr in dir(self) if attr.endswith(suffix) and not attr.startswith('__')]
+        return [getattr(self, attr) for attr in attributes if attr.endswith(suffix) and not attr.startswith('__')]
+
 
 # перечисление аттрибутов FieldsRegister для аннотации метода get_inner_attribute_name_by_value()
 list_of_attributes_FieldsRegister = Enum('list_of_attributes_FieldsRegister',

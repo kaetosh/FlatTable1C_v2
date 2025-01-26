@@ -52,8 +52,8 @@ class IFileProcessor:
             case "account_osv":
                 return osv_fields
 
-    def _get_data_from_table_storage(self,
-                                     file: name_file_table,
+    @staticmethod
+    def _get_data_from_table_storage(file: name_file_table,
                                      dict_df: [name_file_table, TableStorage]) -> Tuple[pd.DataFrame,
                                                                                         Literal['upp', 'notupp'],
                                                                                         Register1c,
@@ -191,9 +191,9 @@ class IFileProcessor:
 
     def special_table_header(self) -> None:
         """
-        Метод удаляет столбцы с пустыми залоговками и приводит заголовки к строковому формату.
-        Метод переопределяется в классах для ОСВ и Обороты счета, т.к. их залоговки отличаются от Анализа счета
-        Шапка таблицы дополняется в зависимости от типа регистра 1С.
+        Метод переопределяется в классах для ОСВ и Обороты счета, так как имена их столбцов отличаются от Анализа счета
+        Метод удаляет столбцы с пустыми именами и приводит имена к строковому формату.
+        Шапка таблицы дополняется в зависимости от типа регистра 1С. (в переопределенных методах)
         """
         for file in self.dict_df:
             df, *_ = self._get_data_from_table_storage()
@@ -298,83 +298,67 @@ class IFileProcessor:
         """
         for file in self.dict_df:
             df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
-            existing_columns = [i for i in df.columns if i in register_fields.get_rename_attributes()]
+            existing_columns = [i for i in df.columns if i in register_fields.get_attributes_by_suffix('_for_rename')]
 
             if df[df[register_fields.version_1c_id] == 'Итого'][existing_columns].empty:
                 raise NoExcelFilesError
             else:
                 df_for_check = df[df[register_fields.version_1c_id] == 'Итого'][[register_fields.version_1c_id] + existing_columns].copy().tail(2).iloc[[0]]
+                df_for_check[existing_columns] = df_for_check[existing_columns].astype(float).fillna(0)
 
-                # для новой версии pandas
-                # with pd.option_context("future.no_silent_downcasting", True):
-                #     df_for_check.loc[:, :] = df_for_check.fillna(0).infer_objects(copy=False)
-
-# new_names = ['Дебет_начало',
-#              'Кредит_начало',
-#              'Дебет_оборот',
-#              'Кредит_оборот',
-#              'Дебет_конец',
-#              'Кредит_конец']
-
-                df_for_check.loc[:, :] = df_for_check.fillna(0).infer_objects(copy=False)
-
-                df_for_check['Сальдо_начало_до_обработки'] = (df_for_check[register_fields.start_debit_balance_for_rename]
+                df_for_check[register_fields.start_balance_before_processing] = (df_for_check[register_fields.start_debit_balance_for_rename]
                                                               - df_for_check[register_fields.start_credit_balance_for_rename])
 
-                df_for_check['Сальдо_конец_до_обработки'] = (df_for_check[register_fields.end_debit_balance_for_rename]
+                df_for_check[register_fields.end_balance_before_processing] = (df_for_check[register_fields.end_debit_balance_for_rename]
                                                              - df_for_check[register_fields.end_credit_balance_for_rename])
 
-                df_for_check['Оборот_до_обработки'] = (df_for_check[register_fields.debit_turnover_for_rename]
+                df_for_check[register_fields.turnover_before_processing] = (df_for_check[register_fields.debit_turnover_for_rename]
                                                        - df_for_check[register_fields.credit_turnover_for_rename])
 
-                df_for_check = df_for_check[[
-                    'Сальдо_начало_до_обработки',
-                    'Оборот_до_обработки',
-                    'Сальдо_конец_до_обработки']].copy()
-                df_for_check = df_for_check.reset_index(drop=True)
+                df_for_check = df_for_check[register_fields.get_attributes_by_suffix('_before_processing')].reset_index(drop=True)
 
                 # запишем таблицу в словарь
                 self.dict_df[file].table_for_check = df_for_check
 
-    def lines_delete(self):
-
+    def lines_delete(self) -> None:
+        """
+        Метод для ОСВ и Оборотов счета. Для анализа сета метод переопределен.
+        После разнесения строк в плоский вид, в таблице остаются строки с дублирующими оборотами.
+        Например, итоговые обороты, итоги по субконто и т.д.
+        Метод их удаляет.
+        """
         for file in self.dict_df:
-            df = self.dict_df[file].table
-            sign_1c = self.dict_df[file].sign_1C
-            register = self.dict_df[file].register
-            register_fields = getattr(register, sign_1c)
-
-            df[register_fields.analytics] = df[register_fields.analytics].astype(str)
+            df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
 
             # Определяем желаемый порядок столбцов
-            desired_order = [
-                'Дебет_начало',
-                'Кредит_начало',
-                'Дебет_оборот',
-                'Кредит_оборот',
-                'Дебет_конец',
-                'Кредит_конец'
-            ]
+            desired_order = register_fields.get_attributes_by_suffix('_for_rename')
 
             # Находим столбцы, заканчивающиеся на '_до' и '_ко'
             do_columns = df.filter(regex='_до$').columns.tolist()
             ko_columns = df.filter(regex='_ко$').columns.tolist()
-
             do_columns.sort()
             ko_columns.sort()
 
+            ind_after_deb_turnover = desired_order.index(register_fields.debit_turnover_for_rename) + 1
+            desired_order[ind_after_deb_turnover:ind_after_deb_turnover] = do_columns
+
+            ind_after_cre_turnover = desired_order.index(register_fields.credit_turnover_for_rename) + 1
+            desired_order[ind_after_cre_turnover:ind_after_cre_turnover] = ko_columns
+
             # Добавляем найденные столбцы к желаемому порядку
-            desired_order.extend(do_columns)
-            desired_order.append('Кредит_оборот')
-            desired_order.extend(ko_columns)
-            desired_order.append('Дебет_конец')
-            desired_order.append('Кредит_конец')
+            # desired_order.extend(do_columns)
+            # desired_order.append('Кредит_оборот')#register_fields.credit_turnover_for_rename
+            # desired_order.extend(ko_columns)
+            # desired_order.append('Дебет_конец')
+            # desired_order.append('Кредит_конец')
+            # for i in desired_order[:]:
+            #     if desired_order.count(i) > 1:
+            #         desired_order.remove(i)
             desired_order = [col for col in desired_order if col in df.columns]
 
-            if sign_1c == 'upp' and df[register_fields.analytics].isin(['Количество']).any():
-                for i in desired_order:
-                    df[f'Количество_{i}'] = df[i].shift(-1)
-            elif sign_1c == 'notupp' and register_fields.quantity in df.columns:
+            print('desired_order:', desired_order)
+
+            if df[register_fields.analytics].isin(['Количество']).any() or register_fields.quantity in df.columns:
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
 
@@ -390,13 +374,10 @@ class IFileProcessor:
                 df = df[~((df['Уровень']==i) & (df[register_fields.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
 
             df = df[~df[register_fields.analytics].isin(exclude_values)].copy()
-            df[register_fields.analytics] = df[register_fields.analytics].astype(str)
-
-            # Список необходимых столбцов
-            required_columns = ['Дебет_начало', 'Кредит_начало', 'Дебет_оборот', 'Кредит_оборот', 'Дебет_конец', 'Кредит_конец']
 
             # Отбор существующих столбцов
-            existing_columns = [col for col in required_columns if col in df.columns]
+            existing_columns = [col for col in register_fields.get_attributes_by_suffix('_for_rename') if col in df.columns]
+            print('existing_columns:', existing_columns)
 
             df = df[df[existing_columns].notna().any(axis=1)]
             df = df.rename(columns={'Счет': 'Субконто'})
