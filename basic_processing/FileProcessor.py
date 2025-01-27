@@ -376,7 +376,7 @@ class IFileProcessor:
             df = df[~df[register_fields.analytics].isin(exclude_values)].copy()
             
             # УТОЧНИТЬ, НЕТ ЛИ ЭТОЙ ОПЕРАЦИИ НА ЭТАПЕ СПЕЦЗАГОЛОВКОВ
-            df = df.rename(columns={'Счет': 'Субконто'})
+            # df = df.rename(columns={'Счет': 'Субконто'})
             df.drop('Уровень', axis=1, inplace=True)
 
             # запишем таблицу в словарь
