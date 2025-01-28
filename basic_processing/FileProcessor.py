@@ -331,17 +331,14 @@ class IFileProcessor:
             df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
 
             # Определяем желаемый порядок столбцов, список [Дебет_начало, Кредит_начало и т. д.]
-            desired_order = register_fields.get_attributes_by_suffix('_for_rename')
-            # оставим в желаемом порядке столбцов только те, которые есть в таблице
-            desired_order = [col for col in desired_order if col in df.columns]
+            # и оставим в желаемом порядке столбцов только те, которые есть в таблице
+            desired_order = [col for col in register_fields.get_attributes_by_suffix('_for_rename') if col in df.columns]
             # отберем только те строки, в которых хотя бы в одном из столбцов, определенных в existing_columns, есть непропущенные значения (не NaN)
             df = df[df[desired_order].notna().any(axis=1)]
 
             # Находим столбцы в таблице, заканчивающиеся на '_до' и '_ко'
-            do_columns = df.filter(regex='_до$').columns.tolist()
-            ko_columns = df.filter(regex='_ко$').columns.tolist()
-            do_columns.sort()
-            ko_columns.sort()
+            do_columns = df.filter(regex='_до$').columns.tolist().sort()
+            ko_columns = df.filter(regex='_ко$').columns.tolist().sort()
 
             try:
                 # Получим индекс столбца Дебет_оборот и вставим после него столбцы с деб. обороатми счетов (для Оборотов счета)
@@ -353,7 +350,6 @@ class IFileProcessor:
                 desired_order[ind_after_cre_turnover:ind_after_cre_turnover] = ko_columns
             except ValueError:
                 raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
-
 
             # если таблица с количественными данными, дополним ее столбцами с количеством путем
             # сдвига соотвествующего столбца на строку вверх, т.к. строки с количеством чередуются с денежными значениями
