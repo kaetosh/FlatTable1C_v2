@@ -402,15 +402,13 @@ class IFileProcessor:
             pivot_df_check = pivot_df_check.infer_objects().fillna(0)
 
             # Вычисление разницы
-            pivot_df_check['Разница_сальдо_нач'] = pivot_df_check['Сальдо_начало_до_обработки'] - pivot_df_check[
-                'Сальдо_начало_после_обработки']
-            pivot_df_check['Разница_оборот'] = pivot_df_check['Оборот_до_обработки'] - pivot_df_check['Оборот_после_обработки']
-            pivot_df_check['Разница_сальдо_кон'] = pivot_df_check['Сальдо_конец_до_обработки'] - pivot_df_check[
-                'Сальдо_конец_после_обработки']
+            pivot_df_check[register_fields.start_balance_deviation] = pivot_df_check[register_fields.start_balance_before_processing] - pivot_df_check[register_fields.start_balance_after_processing]
+            pivot_df_check[register_fields.turnover_deviation] = pivot_df_check[register_fields.turnover_before_processing] - pivot_df_check[register_fields.turnover_after_processing]
+            pivot_df_check[register_fields.end_balance_deviation] = pivot_df_check[register_fields.end_balance_before_processing] - pivot_df_check[register_fields.end_balance_after_processing]
 
-            pivot_df_check['Разница_сальдо_нач'] = pivot_df_check['Разница_сальдо_нач'].apply(lambda x: round(x))
-            pivot_df_check['Разница_оборот'] = pivot_df_check['Разница_оборот'].apply(lambda x: round(x))
-            pivot_df_check['Разница_сальдо_кон'] = pivot_df_check['Разница_сальдо_кон'].apply(lambda x: round(x))
+            pivot_df_check[register_fields.start_balance_deviation] = pivot_df_check[register_fields.start_balance_deviation].apply(lambda x: round(x))
+            pivot_df_check[register_fields.turnover_deviation] = pivot_df_check[register_fields.turnover_deviation].apply(lambda x: round(x))
+            pivot_df_check[register_fields.end_balance_deviation] = pivot_df_check[register_fields.end_balance_deviation].apply(lambda x: round(x))
 
             pivot_df_check['Исх.файл'] = file
 
