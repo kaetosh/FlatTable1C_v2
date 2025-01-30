@@ -387,35 +387,35 @@ class IFileProcessor:
         for file in self.dict_df:
             #df = self.dict_df[file].table
             #df_for_check = self.dict_df[file].table_for_check
-            df, *_, df_for_check = self._get_data_from_table_storage(file, self.dict_df)
+            df, sign_1c, register, register_fields, *_, df_check_before_process = self._get_data_from_table_storage(file, self.dict_df)
 
-            df_for_check_2 = pd.DataFrame()
-            df_for_check_2['Сальдо_начало_после_обработки'] = [df['Дебет_начало'].sum() - df['Кредит_начало'].sum()]
-            df_for_check_2['Оборот_после_обработки'] = [df['Дебет_оборот'].sum() - df['Кредит_оборот'].sum()]
-            df_for_check_2['Сальдо_конец_после_обработки'] = [df['Дебет_конец'].sum() - df['Кредит_конец'].sum()]
-            df_for_check_2 = df_for_check_2.reset_index(drop=True)
+            df_check_after_process = pd.DataFrame()
+            df_check_after_process[register_fields.start_balance_after_processing] = [df[register_fields.start_debit_balance_for_rename].sum() - df[register_fields.start_credit_balance_for_rename].sum()]
+            df_check_after_process[register_fields.turnover_after_processing] = [df[register_fields.debit_turnover_for_rename].sum() - df[register_fields.credit_turnover_for_rename].sum()]
+            df_check_after_process[register_fields.end_balance_after_processing] = [df[register_fields.end_debit_balance_for_rename].sum() - df[register_fields.end_credit_balance_for_rename].sum()]
+            df_check_after_process = df_check_after_process.reset_index(drop=True)
 
             # Объединение DataFrame с использованием внешнего соединения
-            merged_df = pd.concat([df_for_check, df_for_check_2], axis=1)
+            pivot_df_check = pd.concat([df_check_before_process, df_check_after_process], axis=1)
 
             # Заполнение отсутствующих значений нулями
-            merged_df = merged_df.infer_objects().fillna(0)
+            pivot_df_check = pivot_df_check.infer_objects().fillna(0)
 
             # Вычисление разницы
-            merged_df['Разница_сальдо_нач'] = merged_df['Сальдо_начало_до_обработки'] - merged_df[
+            pivot_df_check['Разница_сальдо_нач'] = pivot_df_check['Сальдо_начало_до_обработки'] - pivot_df_check[
                 'Сальдо_начало_после_обработки']
-            merged_df['Разница_оборот'] = merged_df['Оборот_до_обработки'] - merged_df['Оборот_после_обработки']
-            merged_df['Разница_сальдо_кон'] = merged_df['Сальдо_конец_до_обработки'] - merged_df[
+            pivot_df_check['Разница_оборот'] = pivot_df_check['Оборот_до_обработки'] - pivot_df_check['Оборот_после_обработки']
+            pivot_df_check['Разница_сальдо_кон'] = pivot_df_check['Сальдо_конец_до_обработки'] - pivot_df_check[
                 'Сальдо_конец_после_обработки']
 
-            merged_df['Разница_сальдо_нач'] = merged_df['Разница_сальдо_нач'].apply(lambda x: round(x))
-            merged_df['Разница_оборот'] = merged_df['Разница_оборот'].apply(lambda x: round(x))
-            merged_df['Разница_сальдо_кон'] = merged_df['Разница_сальдо_кон'].apply(lambda x: round(x))
+            pivot_df_check['Разница_сальдо_нач'] = pivot_df_check['Разница_сальдо_нач'].apply(lambda x: round(x))
+            pivot_df_check['Разница_оборот'] = pivot_df_check['Разница_оборот'].apply(lambda x: round(x))
+            pivot_df_check['Разница_сальдо_кон'] = pivot_df_check['Разница_сальдо_кон'].apply(lambda x: round(x))
 
-            merged_df['Исх.файл'] = file
+            pivot_df_check['Исх.файл'] = file
 
             # запишем таблицу в словарь
-            self.dict_df[file].table_for_check = merged_df
+            self.dict_df[file].table_for_check = pivot_df_check
 
     def joining_tables(self) -> None:
         list_tables_for_joining = [self.dict_df[i].table for i in self.dict_df]
