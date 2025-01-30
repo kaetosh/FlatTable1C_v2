@@ -184,12 +184,12 @@ class IFileProcessor:
                 # переименуем столбцы, в которых находятся уровни и признак курсива
                 df.columns.values[0] = 'Уровень'
                 df.columns.values[1] = 'Курсив'
-
-                # Столбец с названием файла (названием компании)
-                df['Исх.файл'] = oFile.name
-
-                # запишем таблицу в словарь
+                
                 sign_1c = self.register.get_outer_attribute_name_by_value(first_valid_value)
+                register_fields = getattr(self.register, sign_1c)
+                # Столбец с названием файла (названием компании)
+                df[register_fields.file_name] = oFile.name
+                # запишем таблицу в словарь
                 self.dict_df[oFile.name] = TableStorage(table=df, register=self.register, sign_1C=sign_1c)
 
             else:
@@ -407,25 +407,30 @@ class IFileProcessor:
                                           pivot_df_check[field.replace('deviation', 'after_processing')]).round()
     
             # Помечаем данные именем файла
-            pivot_df_check['Исх.файл'] = file
+            pivot_df_check[register_fields.file_name] = file
     
             # Запись таблицы в хранилище таблиц
             self.dict_df[file].table_for_check = pivot_df_check
 
     def joining_tables(self) -> None:
+        """
+        Объединяет все таблицы друг под другом.
+        """
         list_tables_for_joining = [self.dict_df[i].table for i in self.dict_df]
         list_tables_check_for_joining = [self.dict_df[i].table_for_check for i in self.dict_df]
         self.pivot_table = pd.concat(list_tables_for_joining)
         self.pivot_table_check = pd.concat(list_tables_check_for_joining)
 
     def shiftable_level(self) -> None:
+        """
+        Выравнивает столбцы таким образом, чтобы бух.счета находились в одном столбце
+        """
         for j in range(5):
             list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
             for i in list_lev:
                 # если в столбце есть и субсчет и субконто, нужно выравнивать столбцы
                 if self.pivot_table[i].apply(self._is_accounting_code).nunique() == 2:
-                    shift_level = i  # получили столбец, в котором есть и субсчет и субконто, например Level_2
-                    lm = int(shift_level.split('_')[-1])  # получим его хвостик, например 2
+                    lm = int(i.split('_')[-1])  # получим его хвостик столбца, в котором есть и субсчет и субконто, например Level_2, значит 2
                     # получим перечень столбцов, которые бум двигать (первый - это столбец, где есть и субсчет и субконто)
                     new_list_lev = list_lev[lm:]
                     # сдвигаем:
