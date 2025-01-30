@@ -356,7 +356,7 @@ class IFileProcessor:
                     df[f'Количество_{i}'] = df[i].shift(-1)
 
             # Удалим строки с итоговыми значениями и количественными значениями (строки с кол-вом мы разнесли в столбцы)
-            df = df[~df[register_fields.analytics].str.contains('Итого|Количество')]
+            # df = df[~df[register_fields.analytics].str.contains('Итого|Количество')]
             if register_fields.quantity in df.columns:
                 df = df[~df[register_fields.quantity].str.contains('Кол.', na=False)]
                 df = df.drop([register_fields.quantity], axis=1)
