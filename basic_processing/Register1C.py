@@ -60,6 +60,9 @@ class FieldsRegister:
         self.start_balance_before_processing = 'Сальдо_начало_до_обработки'
         self.turnover_before_processing = 'Оборот_до_обработки'
         self.end_balance_before_processing = 'Сальдо_конец_до_обработки'
+        self.start_balance_after_processing = 'Сальдо_начало_после_обработки'
+        self.turnover_after_processing = 'Оборот_после_обработки'
+        self.end_balance_after_processing = 'Сальдо_конец_после_обработки' 
     def __iter__(self):
         return iter((self.analytics,
                      self.quantity,
@@ -87,7 +90,10 @@ class FieldsRegister:
             'end_credit_balance_for_rename',
             'start_balance_before_processing',
             'turnover_before_processing',
-            'end_balance_before_processing'
+            'end_balance_before_processing',
+            'start_balance_after_processing',
+            'turnover_after_processing',
+            'end_balance_after_processing'
         ]
         #return [getattr(self, attr) for attr in dir(self) if attr.endswith(suffix) and not attr.startswith('__')]
         return [getattr(self, attr) for attr in attributes if attr.endswith(suffix) and not attr.startswith('__')]
