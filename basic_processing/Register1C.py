@@ -66,6 +66,7 @@ class FieldsRegister:
         self.start_balance_deviation = 'Разница_сальдо_нач'
         self.turnover_deviation = 'Разница_оборот'
         self.end_balance_deviation = 'Разница_сальдо_кон'
+        self.file_name = 'Исх.файл' 
     def __iter__(self):
         return iter((self.analytics,
                      self.quantity,
