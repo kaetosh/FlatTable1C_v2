@@ -63,6 +63,9 @@ class FieldsRegister:
         self.start_balance_after_processing = 'Сальдо_начало_после_обработки'
         self.turnover_after_processing = 'Оборот_после_обработки'
         self.end_balance_after_processing = 'Сальдо_конец_после_обработки' 
+        self.start_balance_deviation = 'Разница_сальдо_нач'
+        self.turnover_deviation = 'Разница_оборот'
+        self.end_balance_deviation = 'Разница_сальдо_кон'
     def __iter__(self):
         return iter((self.analytics,
                      self.quantity,
@@ -77,7 +80,8 @@ class FieldsRegister:
                      self.version_1c_id))
     def get_attributes_by_suffix(self, suffix: Literal['_before_processing',
                                                        '_for_rename',
-                                                       '_after_processing']) -> List[str]:
+                                                       '_after_processing',
+                                                       '_deviation']) -> List[str]:
         """
         Получить список имен полей по концовке имени аттрибута.
         """
@@ -93,7 +97,10 @@ class FieldsRegister:
             'end_balance_before_processing',
             'start_balance_after_processing',
             'turnover_after_processing',
-            'end_balance_after_processing'
+            'end_balance_after_processing',
+            'start_balance_deviation,
+            'turnover_deviation',
+            'end_balance_deviation'
         ]
         #return [getattr(self, attr) for attr in dir(self) if attr.endswith(suffix) and not attr.startswith('__')]
         return [getattr(self, attr) for attr in attributes if attr.endswith(suffix) and not attr.startswith('__')]
