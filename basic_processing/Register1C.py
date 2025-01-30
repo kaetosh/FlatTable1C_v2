@@ -98,7 +98,7 @@ class FieldsRegister:
             'start_balance_after_processing',
             'turnover_after_processing',
             'end_balance_after_processing',
-            'start_balance_deviation,
+            'start_balance_deviation',
             'turnover_deviation',
             'end_balance_deviation'
         ]
