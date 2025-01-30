@@ -164,6 +164,7 @@ class TableStorage:
     sign_1C: Literal["upp", "notupp"]
     table_type_connection: pd.DataFrame = field(default=None)
     table_for_check: pd.DataFrame = field(default=None)
+    file_name: str = field(default='NoName')
     def set_index_column(self, name_attribute: str, value: int) -> None:
         """
         В регистре Обороты счета наименования столбцов с оборотами с корреспондирующими счетам
