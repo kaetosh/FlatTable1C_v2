@@ -384,35 +384,32 @@ class IFileProcessor:
             self.dict_df[file].table = df
 
     def revolutions_after_processing(self) -> None:
+        """
+        Добавляет к таблице с оборотами до обработки, созданной методом revolutions_before_processing,
+        данные по оборотам после обработки и отклонениями между ними.
+        """
         for file in self.dict_df:
-            #df = self.dict_df[file].table
-            #df_for_check = self.dict_df[file].table_for_check
             df, sign_1c, register, register_fields, *_, df_check_before_process = self._get_data_from_table_storage(file, self.dict_df)
-
-            df_check_after_process = pd.DataFrame()
-            df_check_after_process[register_fields.start_balance_after_processing] = [df[register_fields.start_debit_balance_for_rename].sum() - df[register_fields.start_credit_balance_for_rename].sum()]
-            df_check_after_process[register_fields.turnover_after_processing] = [df[register_fields.debit_turnover_for_rename].sum() - df[register_fields.credit_turnover_for_rename].sum()]
-            df_check_after_process[register_fields.end_balance_after_processing] = [df[register_fields.end_debit_balance_for_rename].sum() - df[register_fields.end_credit_balance_for_rename].sum()]
-            df_check_after_process = df_check_after_process.reset_index(drop=True)
-
-            # Объединение DataFrame с использованием внешнего соединения
-            pivot_df_check = pd.concat([df_check_before_process, df_check_after_process], axis=1)
-
-            # Заполнение отсутствующих значений нулями
-            pivot_df_check = pivot_df_check.infer_objects().fillna(0)
-
-            # Вычисление разницы
-            pivot_df_check[register_fields.start_balance_deviation] = pivot_df_check[register_fields.start_balance_before_processing] - pivot_df_check[register_fields.start_balance_after_processing]
-            pivot_df_check[register_fields.turnover_deviation] = pivot_df_check[register_fields.turnover_before_processing] - pivot_df_check[register_fields.turnover_after_processing]
-            pivot_df_check[register_fields.end_balance_deviation] = pivot_df_check[register_fields.end_balance_before_processing] - pivot_df_check[register_fields.end_balance_after_processing]
-
-            pivot_df_check[register_fields.start_balance_deviation] = pivot_df_check[register_fields.start_balance_deviation].apply(lambda x: round(x))
-            pivot_df_check[register_fields.turnover_deviation] = pivot_df_check[register_fields.turnover_deviation].apply(lambda x: round(x))
-            pivot_df_check[register_fields.end_balance_deviation] = pivot_df_check[register_fields.end_balance_deviation].apply(lambda x: round(x))
-
+            
+            # Вычисление итоговых значений - свернутые значения сальдо и оборотов - обработанных таблиц
+            df_check_after_process = pd.DataFrame({
+                register_fields.start_balance_after_processing: [df[register_fields.start_debit_balance_for_rename].sum() - df[register_fields.start_credit_balance_for_rename].sum()],
+                register_fields.turnover_after_processing: [df[register_fields.debit_turnover_for_rename].sum() - df[register_fields.credit_turnover_for_rename].sum()],
+                register_fields.end_balance_after_processing: [df[register_fields.end_debit_balance_for_rename].sum() - df[register_fields.end_credit_balance_for_rename].sum()]
+            })
+    
+            # Объединение таблиц - обороты до и после обработки таблиц
+            pivot_df_check = pd.concat([df_check_before_process, df_check_after_process], axis=1).fillna(0)
+    
+            # Вычисление отклонений в данных до и после обработки таблиц
+            for field in register_fieldsget_attributes_by_suffix('_deviation'):
+                pivot_df_check[field] = (pivot_df_check[field.replace('deviation', 'before_processing')] - 
+                                          pivot_df_check[field.replace('deviation', 'after_processing')]).round()
+    
+            # Помечаем данные именем файла
             pivot_df_check['Исх.файл'] = file
-
-            # запишем таблицу в словарь
+    
+            # Запись таблицы в хранилище таблиц
             self.dict_df[file].table_for_check = pivot_df_check
 
     def joining_tables(self) -> None:
