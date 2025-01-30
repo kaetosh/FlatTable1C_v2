@@ -333,15 +333,13 @@ class IFileProcessor:
             # Определяем желаемый порядок столбцов, список [Дебет_начало, Кредит_начало и т. д.]
             # и оставим в желаемом порядке столбцов только те, которые есть в таблице
             desired_order = [col for col in register_fields.get_attributes_by_suffix('_for_rename') if col in df.columns]
-            # отберем только те строки, в которых хотя бы в одном из столбцов, определенных в existing_columns, есть непропущенные значения (не NaN)
-            df = df[df[desired_order].notna().any(axis=1)]
 
             # Находим столбцы в таблице, заканчивающиеся на '_до' и '_ко'
             do_columns = df.filter(regex='_до$').columns.tolist().sort()
             ko_columns = df.filter(regex='_ко$').columns.tolist().sort()
 
             try:
-                # Получим индекс столбца Дебет_оборот и вставим после него столбцы с деб. обороатми счетов (для Оборотов счета)
+                # Получим индекс столбца Дебет_оборот и вставим после него столбцы с деб. оборотами счетов (для Оборотов счета)
                 ind_after_deb_turnover = desired_order.index(register_fields.debit_turnover_for_rename) + 1
                 desired_order[ind_after_deb_turnover:ind_after_deb_turnover] = do_columns
                 
@@ -357,15 +355,12 @@ class IFileProcessor:
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
 
-            max_level = df['Уровень'].max()
-
             # Удалим строки с итоговыми значениями и количественными значениями (строки с кол-вом мы разнесли в столбцы)
-            df = df[~df[register_fields.analytics].str.contains('Итого')]
-            df = df[~df[register_fields.analytics].str.contains('Количество')]
+            df = df[~df[register_fields.analytics].str.contains('Итого|Количество')]
             if register_fields.quantity in df.columns:
                 df = df[~df[register_fields.quantity].str.contains('Кол.', na=False)]
                 df = df.drop([register_fields.quantity], axis=1)
-            for i in range(max_level):
+            for i in range(df['Уровень'].max()):
                 df = df[~((df['Уровень']==i) & (df[register_fields.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
 
             # Удаляем строки, содержащие значения из списка exclude_values
@@ -374,6 +369,9 @@ class IFileProcessor:
             # УТОЧНИТЬ, НЕТ ЛИ ЭТОЙ ОПЕРАЦИИ НА ЭТАПЕ СПЕЦЗАГОЛОВКОВ
             # df = df.rename(columns={'Счет': 'Субконто'})
             df.drop('Уровень', axis=1, inplace=True)
+
+            # отберем только те строки, в которых хотя бы в одном из столбцов, определенных в existing_columns, есть непропущенные значения (не NaN)
+            df = df[df[desired_order].notna().any(axis=1)]
 
             # запишем таблицу в словарь
             self.dict_df[file].table = df
