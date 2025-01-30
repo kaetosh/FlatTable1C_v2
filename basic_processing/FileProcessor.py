@@ -21,6 +21,9 @@ from pre_processing.ExcelFilePreprocessor import ExcelFilePreprocessor
 name_file_register = str
 name_file_table = str
 accounting_account = str
+table = pd.DataFrame
+table_for_check = pd.DataFrame
+table_type_connection = pd.DataFrame
 
 class IFileProcessor:
 
@@ -54,15 +57,19 @@ class IFileProcessor:
 
     @staticmethod
     def _get_data_from_table_storage(file: name_file_table,
-                                     dict_df: [name_file_table, TableStorage]) -> Tuple[pd.DataFrame,
+                                     dict_df: [name_file_table, TableStorage]) -> Tuple[table,
                                                                                         Literal['upp', 'notupp'],
                                                                                         Register1c,
-                                                                                        FieldsRegister]:
+                                                                                        FieldsRegister,
+                                                                                        table_type_connection,
+                                                                                        table_for_check]:
         df = dict_df[file].table
         sign_1c = dict_df[file].sign_1C
         register = dict_df[file].register
         register_fields = getattr(register, sign_1c)
-        return df, sign_1c, register, register_fields
+        table_type_connection = dict_df[file].table_type_connection
+        table_for_check = dict_df[file].table_for_check                                                                              
+        return df, sign_1c, register, register_fields, table_type_connection, table_for_check
 
     @staticmethod
     def _is_accounting_code(value: accounting_account) -> bool:
@@ -210,7 +217,7 @@ class IFileProcessor:
         Такие пропущенные значения заполняются "Не_заполнено".
         """
         for file in self.dict_df:
-            df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # Для выгрузок с полем "Количество"
             if register_fields.quantity in df.columns:
@@ -266,7 +273,7 @@ class IFileProcessor:
         Договор поставки №1) будут удалены (метод lines_delete).
         """
         for file in self.dict_df:
-            df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # Инициализация переменной для хранения предыдущего значения
             prev_value = None
@@ -297,7 +304,7 @@ class IFileProcessor:
         сравнить их с данными по оборотам после обработки с целью убедиться в корректности обработки
         """
         for file in self.dict_df:
-            df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
             existing_columns = [i for i in df.columns if i in register_fields.get_attributes_by_suffix('_for_rename')]
 
             if df[df[register_fields.version_1c_id] == 'Итого'][existing_columns].empty:
@@ -328,7 +335,7 @@ class IFileProcessor:
         Метод их удаляет.
         """
         for file in self.dict_df:
-            df, sign_1c, register, register_fields = self._get_data_from_table_storage(file, self.dict_df)
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # Определяем желаемый порядок столбцов, список [Дебет_начало, Кредит_начало и т. д.]
             # и оставим в желаемом порядке столбцов только те, которые есть в таблице
@@ -378,8 +385,9 @@ class IFileProcessor:
 
     def revolutions_after_processing(self) -> None:
         for file in self.dict_df:
-            df = self.dict_df[file].table
-            df_for_check = self.dict_df[file].table_for_check
+            #df = self.dict_df[file].table
+            #df_for_check = self.dict_df[file].table_for_check
+            df, *_, df_for_check = self._get_data_from_table_storage(file, self.dict_df)
 
             df_for_check_2 = pd.DataFrame()
             df_for_check_2['Сальдо_начало_после_обработки'] = [df['Дебет_начало'].sum() - df['Кредит_начало'].sum()]
