@@ -29,4 +29,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-    #для теста git
+    #для теста git update
