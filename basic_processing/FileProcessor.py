@@ -347,12 +347,14 @@ class IFileProcessor:
 
             try:
                 # Получим индекс столбца Дебет_оборот и вставим после него столбцы с деб. оборотами счетов (для Оборотов счета)
-                ind_after_deb_turnover = desired_order.index(register_fields.debit_turnover_for_rename) + 1
-                desired_order[ind_after_deb_turnover:ind_after_deb_turnover] = do_columns
+                if do_columns:
+                    ind_after_deb_turnover = desired_order.index(register_fields.debit_turnover_for_rename) + 1
+                    desired_order[ind_after_deb_turnover:ind_after_deb_turnover] = do_columns
                 
                 # Получим индекс столбца Кредит_оборот и вставим после него столбцы с кр. обороатми счетов (для Оборотов счета)
-                ind_after_cre_turnover = desired_order.index(register_fields.credit_turnover_for_rename) + 1
-                desired_order[ind_after_cre_turnover:ind_after_cre_turnover] = ko_columns
+                if ko_columns:
+                    ind_after_cre_turnover = desired_order.index(register_fields.credit_turnover_for_rename) + 1
+                    desired_order[ind_after_cre_turnover:ind_after_cre_turnover] = ko_columns
             except ValueError:
                 raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
 
@@ -402,9 +404,9 @@ class IFileProcessor:
             pivot_df_check = pd.concat([df_check_before_process, df_check_after_process], axis=1).fillna(0)
     
             # Вычисление отклонений в данных до и после обработки таблиц
-            for field in register_fieldsget_attributes_by_suffix('_deviation'):
-                pivot_df_check[field] = (pivot_df_check[field.replace('deviation', 'before_processing')] - 
-                                          pivot_df_check[field.replace('deviation', 'after_processing')]).round()
+            for field in register_fields.get_attributes_by_suffix('_deviation'):
+                pivot_df_check[field] = (pivot_df_check[field.replace('_разница', '_до_обработки')] -
+                                          pivot_df_check[field.replace('_разница', '_после_обработки')]).round()
     
             # Помечаем данные именем файла
             pivot_df_check[register_fields.file_name] = file
@@ -417,13 +419,20 @@ class IFileProcessor:
         Объединяет все таблицы друг под другом.
         """
         list_tables_for_joining = [self.dict_df[i].table for i in self.dict_df]
+        list_tables_for_joining = [df.reset_index(drop=True) for df in list_tables_for_joining]
+
         list_tables_check_for_joining = [self.dict_df[i].table_for_check for i in self.dict_df]
-        self.pivot_table = pd.concat(list_tables_for_joining)
-        self.pivot_table_check = pd.concat(list_tables_check_for_joining)
+        list_tables_check_for_joining = [df.reset_index(drop=True) for df in list_tables_check_for_joining]
+
+        self.pivot_table = pd.concat(list_tables_for_joining, ignore_index=True)
+        self.pivot_table_check = pd.concat(list_tables_check_for_joining, ignore_index=True)
 
     def shiftable_level(self) -> None:
         """
-        Выравнивает столбцы таким образом, чтобы бух.счета находились в одном столбце
+        Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце
+
+        !!!! Добавить алгоритм сортировки столбцов в нужном порядке
+
         """
         for j in range(5):
             list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
@@ -438,8 +447,10 @@ class IFileProcessor:
                         lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
                             x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1)
                     break
+        self.pivot_table.to_excel('SupPivot.xlsx')
 
     def rename_columns(self) -> None:
+
 
         # Разделяем столбцы на две группы
         level_columns = [col for col in self.pivot_table.columns if 'Level_' in col]
