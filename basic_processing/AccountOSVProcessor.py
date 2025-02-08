@@ -1,22 +1,20 @@
+"""
+В ОСВ наименования сальдо/оборотов и дебет/кредит в разных строках,
+поэтому добавляем к дебет/кредит 'начало', 'оборот', 'конец'
+"""
+
 import pandas as pd
 from basic_processing.FileProcessor import IFileProcessor
-pd.options.mode.copy_on_write = False
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', 1000)
 
 
 class AccountOSVProcessor(IFileProcessor):
     def special_table_header(self) -> None:
         for file in self.dict_df:
-            df = self.dict_df[file].table
+            # Выгрузим обрабатываемую таблицу из хранилища таблиц
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # счетчик того, сколько столбцов Дебет и Кредит
             counters = {'Дебет': 0, 'Кредит': 0}
-
-            '''
-            в ОСВ наименования сальдо/оборотов и дебет/кредит в разных строках,
-            поэтому добавляем к дебет/кредит 'начало', 'оборот', 'конец'
-            '''
 
             def update_account_list(item):
                 if item in counters:

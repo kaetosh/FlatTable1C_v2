@@ -22,7 +22,6 @@ def main():
     processor.revolutions_after_processing()
     processor.joining_tables()
     processor.shiftable_level()
-    #processor.rename_columns()
     processor.unloading_pivot_table()
     processor.process_end()
 

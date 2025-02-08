@@ -52,11 +52,17 @@ class FieldsRegister:
         self.end_credit_balance = end_credit_balance
         self.version_1c_id = version_1c_id
         self.start_debit_balance_for_rename = 'Дебет_начало' # входящий дебетовый остаток для единообразия имен полей
+        self.start_quantity_debit_balance_for_rename = 'Количество_Дебет_начало'
         self.start_credit_balance_for_rename = 'Кредит_начало' # входящий кредитовый остаток для единообразия имен полей
+        self.start_quantity_credit_balance_for_rename = 'Количество_Кредит_начало'
         self.debit_turnover_for_rename = 'Дебет_оборот' # дебетовый оборот для единообразия имен полей
+        self.debit_quantity_turnover_for_rename = 'Количество_Дебет_оборот'
         self.credit_turnover_for_rename = 'Кредит_оборот' # кредитовый оборот для единообразия имен полей
+        self.credit_quantity_turnover_for_rename = 'Количество_Кредит_оборот'
         self.end_debit_balance_for_rename = 'Дебет_конец' # исходящий дебетовый остаток для единообразия имен полей
+        self.end_quantity_debit_balance_for_rename = 'Количество_Дебет_конец'
         self.end_credit_balance_for_rename = 'Кредит_конец' # исходящий кредитовый остаток для единообразия имен полей
+        self.end_quantity_credit_balance_for_rename = 'Количество_Кредит_конец'
         self.start_balance_before_processing = 'Сальдо_начало_до_обработки'
         self.turnover_before_processing = 'Оборот_до_обработки'
         self.end_balance_before_processing = 'Сальдо_конец_до_обработки'
@@ -88,11 +94,17 @@ class FieldsRegister:
         """
         attributes = [
             'start_debit_balance_for_rename',
+            'start_quantity_debit_balance_for_rename',
             'start_credit_balance_for_rename',
+            'start_quantity_credit_balance_for_rename',
             'debit_turnover_for_rename',
+            'debit_quantity_turnover_for_rename',
             'credit_turnover_for_rename',
+            'credit_quantity_turnover_for_rename',
             'end_debit_balance_for_rename',
+            'end_quantity_debit_balance_for_rename',
             'end_credit_balance_for_rename',
+            'end_quantity_credit_balance_for_rename',
             'start_balance_before_processing',
             'turnover_before_processing',
             'end_balance_before_processing',

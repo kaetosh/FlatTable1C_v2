@@ -12,7 +12,7 @@ pd.options.mode.copy_on_write = False
 import numpy as np
 from pathlib import Path
 from basic_processing.Register1C import Register1c, FieldsRegister, TableStorage
-from config import new_names, osv_fields, turnover_fields, analysis_fields, exclude_values
+from config import osv_fields, turnover_fields, analysis_fields, exclude_values
 from additional.ErrorClasses import NoExcelFilesError
 from pre_processing.ExcelFileConverter import ExcelFileConverter
 from pre_processing.ExcelFilePreprocessor import ExcelFilePreprocessor
@@ -39,7 +39,6 @@ class IFileProcessor:
         self.converter: ExcelFileConverter = ExcelFileConverter() # класс для пересохранения файлов (регистров)
         self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor() # класс для предварительной обработки файлов (регистров)
         self.register: Register1c = self._get_fields_register() # класс с полями обрабатываемых регистров
-        print('pd.version:', pd.__version__)
 
     def _get_fields_register(self) -> Register1c:
         """
@@ -54,6 +53,8 @@ class IFileProcessor:
                 return analysis_fields
             case "account_osv":
                 return osv_fields
+            case _:
+                raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
 
     @staticmethod
     def _get_data_from_table_storage(file: name_file_table,
@@ -67,9 +68,9 @@ class IFileProcessor:
         sign_1c = dict_df[file].sign_1C
         register = dict_df[file].register
         register_fields = getattr(register, sign_1c)
-        table_type_connection = dict_df[file].table_type_connection
-        table_for_check = dict_df[file].table_for_check                                                                              
-        return df, sign_1c, register, register_fields, table_type_connection, table_for_check
+        connection_type = dict_df[file].table_type_connection
+        check_table = dict_df[file].table_for_check
+        return df, sign_1c, register, register_fields, connection_type, check_table
 
     @staticmethod
     def _is_accounting_code(value: accounting_account) -> bool:
@@ -107,7 +108,7 @@ class IFileProcessor:
     @staticmethod
     def _get_path_excel_files()-> List[Path]:
         """
-        Т.к. скрипт должен запускаться из папки с исходными файлами,
+        Так как скрипт должен запускаться из папки с исходными файлами,
         функция получает список путей к файлам из этой папки
         """
         path_folder_excel_files: Path = Path(os.getcwd())
@@ -143,14 +144,14 @@ class IFileProcessor:
             - добавления столбца с номерами группировок строк (используется для создания плоской таблицы)
             - добавление столбца с признаком курсивного шрифта (актуально для анализа счета в УПП, строки с курсивом
             это промежуточные итоги, для исключения в сводном файле)
-        Обновление атрибута self.excel_files т.к. .xls пересохранены в .xlsx
+        Обновление атрибута self.excel_files так как .xls пересохранены в .xlsx
         """
         self.excel_files = self._get_path_excel_files()
         self.preprocessor.preprocessor_openpyxl(self.excel_files, self.file_type)
 
     def general_table_header(self) -> None:
         """
-        Функция в цикле проходит по каждому файлу, загружает его в pandas.DataFrame.
+        Функция в цикле проходит по каждому файлу, загружает его в pandas. DataFrame.
         Далее находит строку, в которой есть совпадение с хоть одним значением
         из self.register (класс FieldsRegister регистра 1С, содержащий названия полей)
         и использует эту строку как шапку таблицы.
@@ -203,7 +204,7 @@ class IFileProcessor:
         Шапка таблицы дополняется в зависимости от типа регистра 1С. (в переопределенных методах)
         """
         for file in self.dict_df:
-            df, *_ = self._get_data_from_table_storage()
+            df, *_ = self._get_data_from_table_storage(file, self.dict_df)
             df = df.loc[:, df.columns.notna()]
             df.columns = df.columns.astype(str)
             # запишем таблицу в словарь
@@ -212,7 +213,7 @@ class IFileProcessor:
     def handle_missing_values(self):
         """
         Выгруженные регистры зачастую могут содержать пропущенные значения,
-        обычно Вид.Субконто, например для некоторых значений счета учета запасов могут не содержать значение
+        обычно Вид. Субконто, например для некоторых значений счета учета запасов могут не содержать значение
         "Вид номенклатуры", счета учета расчетов - Вид контрагента или Вид договора.
         Такие пропущенные значения заполняются "Не_заполнено".
         """
@@ -354,7 +355,7 @@ class IFileProcessor:
             #         ind_after_deb_turnover = desired_order.index(register_fields.debit_turnover_for_rename) + 1
             #         desired_order[ind_after_deb_turnover:ind_after_deb_turnover] = do_columns
             #
-            #     # Получим индекс столбца Кредит_оборот и вставим после него столбцы с кр. обороатми счетов (для Оборотов счета)
+            #     # Получим индекс столбца Кредит_оборот и вставим после него столбцы с кр. оборотами счетов (для Оборотов счета)
             #     if ko_columns:
             #         ind_after_cre_turnover = desired_order.index(register_fields.credit_turnover_for_rename) + 1
             #         desired_order[ind_after_cre_turnover:ind_after_cre_turnover] = ko_columns
@@ -432,9 +433,8 @@ class IFileProcessor:
 
     def shiftable_level(self) -> None:
         """
-        Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце
-
-        !!!! Добавить алгоритм сортировки столбцов в нужном порядке
+        Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
+        Сортировка столбцов в нужном порядке.
 
         """
         for j in range(5):
@@ -450,71 +450,44 @@ class IFileProcessor:
                         lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
                             x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1)
                     break
-        self.pivot_table.to_excel('SupPivot.xlsx')
 
-    def rename_columns(self) -> None:
+        # Получим список столбцов с сальдо и оборотами
+        register_fields = self._get_fields_register().upp # upp или notupp без разницы, поля одинаковые
+        desired_order = register_fields.get_attributes_by_suffix('_for_rename')
 
+        # Находим столбцы в таблице, заканчивающиеся на '_до' и '_ко'
+        do_columns = sorted(self.pivot_table.filter(regex='_до$').columns.tolist())
+        ko_columns = sorted(self.pivot_table.filter(regex='_ко$').columns.tolist())
 
-        # Разделяем столбцы на две группы
+        # Функция для вставки столбцов
+        def insert_columns(columns, reference_column):
+            if columns:
+                try:
+                    ind_after = desired_order.index(reference_column) + 1
+                    desired_order[ind_after:ind_after] = columns
+                except ValueError:
+                    raise NoExcelFilesError(f'Column {reference_column} not found in desired_order.')
+
+        # Вставляем столбцы с lt, и кред оборотами в список заголовков
+        insert_columns(do_columns, register_fields.debit_quantity_turnover_for_rename)
+        insert_columns(ko_columns, register_fields.credit_quantity_turnover_for_rename)
+
+        # Отберем столбцы c "Level_"
         level_columns = [col for col in self.pivot_table.columns if 'Level_' in col]
-
         # Сортируем столбцы с Level_ по числовому значению в их названиях
         level_columns.sort(key=lambda x: int(x.split('_')[1]))
-
-        new_names_for_upp = {self.register.upp.analytics: 'Аналитика',
-                             self.register.upp.start_debit_balance: 'Дебет_начало',
-                             self.register.upp.start_credit_balance: 'Кредит_начало',
-                             self.register.upp.debit_turnover: 'Дебет_оборот',
-                             self.register.upp.credit_turnover: 'Кредит_оборот',
-                             self.register.upp.end_debit_balance: 'Дебет_конец',
-                             self.register.upp.end_credit_balance: 'Кредит_конец'}
-        new_names_for_notupp = {self.register.notupp.analytics: 'Аналитика',
-                                self.register.notupp.start_debit_balance: 'Дебет_начало',
-                                self.register.notupp.start_credit_balance: 'Кредит_начало',
-                                self.register.notupp.debit_turnover: 'Дебет_оборот',
-                                self.register.notupp.credit_turnover: 'Кредит_оборот',
-                                self.register.notupp.end_debit_balance: 'Дебет_конец',
-                                self.register.notupp.end_credit_balance: 'Кредит_конец'}
-
-        self.pivot_table = self.pivot_table.rename(columns=new_names_for_upp, errors='ignore')
-        self.pivot_table = self.pivot_table.rename(columns=new_names_for_notupp, errors='ignore')
-
-        # Определяем желаемый порядок столбцов
-        desired_order = [
-            'Исх.файл',
-            'Аналитика',
-            'Дебет_начало',
-            'Количество_Дебет_начало',
-            'Кредит_начало',
-            'Количество_Кредит_начало',
-            'Дебет_оборот',
-            'Количество_Дебет_оборот'
-        ]
-
-        # Находим столбцы, заканчивающиеся на '_до' и '_ко'
-        do_columns = self.pivot_table.filter(regex='_до$').columns.tolist()
-        ko_columns = self.pivot_table.filter(regex='_ко$').columns.tolist()
-
-        do_columns.sort()
-        ko_columns.sort()
-
-        # Добавляем найденные столбцы к желаемому порядку
-        desired_order.extend(do_columns)
-        desired_order.append('Кредит_оборот')
-        desired_order.append('Количество_Кредит_оборот')
-        desired_order.extend(ko_columns)
-        desired_order.append('Дебет_конец')
-        desired_order.append('Количество_Дебет_конец')
-        desired_order.append('Кредит_конец')
-        desired_order.append('Количество_Кредит_конец')
-
+        # Формируем итоговый порядок необходимых столбцов
+        desired_order = [register_fields.file_name, register_fields.analytics] + desired_order + level_columns
         # Отбор существующих столбцов
-        existing_columns = [col for col in desired_order if col in self.pivot_table.columns]
-
+        desired_order = [col for col in desired_order if col in self.pivot_table.columns]
         # Используем reindex для сортировки DataFrame
-        self.pivot_table = self.pivot_table.reindex(columns=(existing_columns + level_columns)).copy()
+        self.pivot_table = self.pivot_table.reindex(columns=desired_order).copy()
+
 
     def unloading_pivot_table(self) -> None:
+        """
+        Выгружает финальный файл в Excel: сводная таблица и таблица с отклонениями на отдельных листах.
+        """
         folder_path_summary_files = f"_Pivot_{self.file_type}.xlsx"
         with pd.ExcelWriter(folder_path_summary_files) as writer:
             self.pivot_table.to_excel(writer, sheet_name='Свод', index=False)
