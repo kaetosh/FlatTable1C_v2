@@ -187,7 +187,11 @@ class IFileProcessor:
                 # переименуем столбцы, в которых находятся уровни и признак курсива
                 df.columns.values[0] = 'Уровень'
                 df.columns.values[1] = 'Курсив'
-                
+
+                if df['Уровень'].max() == 0:
+                    self.empty_files.append(oFile.name)
+                    continue
+
                 sign_1c = self.register.get_outer_attribute_name_by_value(first_valid_value)
                 register_fields = getattr(self.register, sign_1c)
                 # Столбец с названием файла (названием компании)
@@ -287,9 +291,12 @@ class IFileProcessor:
             # получим максимальный уровень иерархии
             max_level = df['Уровень'].max()
 
+            print('/nmax_level=', max_level)
+
             # пустой файл отправил в специальный список
             if max_level == 0:
                 self.empty_files.append(file)
+                continue
 
             # разнесем уровни в горизонтальную ориентацию в цикле
             for i in range(max_level + 1):
@@ -362,21 +369,27 @@ class IFileProcessor:
 
             # Если таблица с количественными данными, дополним ее столбцами с количеством путем
             # сдвига соответствующего столбца на строку вверх, так как строки с количеством чередуются с денежными значениями
+            print('register_fields.analytics=', register_fields.analytics)
             if df[register_fields.analytics].isin(['Количество']).any() or register_fields.quantity in df.columns:
+                print('файл с количеством')
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
 
             # Удалим строки с итоговыми значениями и количественными значениями (строки с кол-вом мы разнесли в столбцы)
-            # df = df[~df[register_fields.analytics].str.contains('Итого|Количество')]
+            df = df[~df[register_fields.analytics].str.contains('Итого|Количество')]
             if register_fields.quantity in df.columns:
                 df = df[~df[register_fields.quantity].str.contains('Кол.', na=False)]
                 df = df.drop([register_fields.quantity], axis=1)
+
+            print('file=', file)
+            print('df[Уровень].max()', df['Уровень'].max())
+
             for i in range(df['Уровень'].max()):
                 df = df[~((df['Уровень']==i) & (df[register_fields.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
 
             # Удаляем строки, содержащие значения из списка exclude_values
             df = df[~df[register_fields.analytics].isin(exclude_values)].copy()
-            
+
             # УТОЧНИТЬ, НЕТ ЛИ ЭТОЙ ОПЕРАЦИИ НА ЭТАПЕ СПЕЦЗАГОЛОВКОВ
             # df = df.rename(columns={'Счет': 'Субконто'})
             df.drop('Уровень', axis=1, inplace=True)
@@ -395,25 +408,25 @@ class IFileProcessor:
         for x, file in enumerate(self.dict_df):
             progress_bar(x + 1, len(self.excel_files), prefix='Сохраняем данные по оборотам после обработки в таблицах')
             df, sign_1c, register, register_fields, *_, df_check_before_process = self._get_data_from_table_storage(file, self.dict_df)
-            
+
             # Вычисление итоговых значений - свернутые значения сальдо и оборотов - обработанных таблиц
             df_check_after_process = pd.DataFrame({
                 register_fields.start_balance_after_processing: [df[register_fields.start_debit_balance_for_rename].sum() - df[register_fields.start_credit_balance_for_rename].sum()],
                 register_fields.turnover_after_processing: [df[register_fields.debit_turnover_for_rename].sum() - df[register_fields.credit_turnover_for_rename].sum()],
                 register_fields.end_balance_after_processing: [df[register_fields.end_debit_balance_for_rename].sum() - df[register_fields.end_credit_balance_for_rename].sum()]
             })
-    
+
             # Объединение таблиц - обороты до и после обработки таблиц
             pivot_df_check = pd.concat([df_check_before_process, df_check_after_process], axis=1).fillna(0)
-    
+
             # Вычисление отклонений в данных до и после обработки таблиц
             for field in register_fields.get_attributes_by_suffix('_deviation'):
                 pivot_df_check[field] = (pivot_df_check[field.replace('_разница', '_до_обработки')] -
                                           pivot_df_check[field.replace('_разница', '_после_обработки')]).round()
-    
+
             # Помечаем данные именем файла
             pivot_df_check[register_fields.file_name] = file
-    
+
             # Запись таблицы в хранилище таблиц
             self.dict_df[file].table_for_check = pivot_df_check
 
