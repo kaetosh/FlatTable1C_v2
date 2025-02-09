@@ -1,17 +1,15 @@
 import pandas as pd
 from basic_processing.FileProcessor import IFileProcessor
 pd.options.mode.copy_on_write = False
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', 1000)
 import numpy as np
-from config import analysis_fields, exclude_values, accounts_without_subaccount
+from config import exclude_values, accounts_without_subaccount
+from additional.progress_bar import progress_bar
 
 class AccountAnalysisProcessor(IFileProcessor):
     def handle_missing_values(self):
-        for file in self.dict_df:
-            df = self.dict_df[file].table
-            sign_1c = self.dict_df[file].sign_1C
-            register_fields = getattr(analysis_fields, sign_1c)
+        for x, file in enumerate(self.dict_df):
+            progress_bar(x + 1, len(self.dict_df), prefix='Установка специальных заголовков в таблицах')
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # сохраним столбец "Вид связи КА" в отдельный фрейм
             # чтобы в методе lines_delete проставить пропущенные значения "Вид связи КА"
@@ -49,10 +47,9 @@ class AccountAnalysisProcessor(IFileProcessor):
             self.dict_df[file].table = df
 
     def corr_account_col(self) -> None:
-        for file in self.dict_df:
-            df = self.dict_df[file].table
-            sign_1c = self.dict_df[file].sign_1C
-            register_fields = getattr(analysis_fields, sign_1c)
+        for x, file in enumerate(self.dict_df):
+            progress_bar(x + 1, len(self.dict_df), prefix='Установка столбца с корреспондирубщим счетом в таблицах')
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # добавим столбец корр.счет, взяв его из основного столбца, при условии, что значение - бухгалтерских счет (функция is_accounting_code)
             df['Корр_счет'] = df[register_fields.corresponding_account].apply(
@@ -71,11 +68,9 @@ class AccountAnalysisProcessor(IFileProcessor):
             self.dict_df[file].table = df
 
     def revolutions_before_processing(self) -> None:
-        for file in self.dict_df:
-            df = self.dict_df[file].table
-            sign_1c = self.dict_df[file].sign_1C
-            register = self.dict_df[file].register
-            register_fields = getattr(register, sign_1c)
+        for x, file in enumerate(self.dict_df):
+            progress_bar(x + 1, len(self.dict_df), prefix='Сохраняем данные по оборотам до обработки в таблицах')
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
             df_for_check = df[[register_fields.corresponding_account,
                                register_fields.debit_turnover,
                                register_fields.credit_turnover]].copy()
@@ -108,11 +103,9 @@ class AccountAnalysisProcessor(IFileProcessor):
             self.dict_df[file].table_for_check = df_for_check
 
     def lines_delete(self):
-
-        for file in self.dict_df:
-            df = self.dict_df[file].table
-            sign_1c = self.dict_df[file].sign_1C
-            register_fields = getattr(analysis_fields, sign_1c)
+        for x, file in enumerate(self.dict_df):
+            progress_bar(x + 1, len(self.dict_df), prefix='Удаляем строки с дублирующими оборотами в таблицах')
+            df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
             df_delete = df[~df[register_fields.corresponding_account].isin(exclude_values)]
             df_delete = df_delete.dropna(subset=[register_fields.corresponding_account]).copy()
             df_delete = df_delete[df_delete['Курсив'] == 0][[register_fields.corresponding_account, 'Корр_счет']]
@@ -127,8 +120,7 @@ class AccountAnalysisProcessor(IFileProcessor):
                     all_acc_dict[item] = 1
 
             # счета с субсчетами
-            acc_with_sub = [i for i in all_acc_dict if self._is_parent(i, all_acc_dict)]
-
+            acc_with_sub = [i for i in all_acc_dict if self._is_parent(i, list(all_acc_dict.keys()))]
             clean_acc = [i for i in all_acc_dict if i not in acc_with_sub]
             clean_acc = [i for i in clean_acc if all_acc_dict[i] == 1]
             del_acc = [i for i in all_acc_dict if i not in clean_acc]
@@ -244,7 +236,8 @@ class AccountAnalysisProcessor(IFileProcessor):
             self.dict_df[file].table = df
 
     def revolutions_after_processing(self) -> None:
-        for file in self.dict_df:
+        for x, file in enumerate(self.dict_df):
+            progress_bar(x + 1, len(self.dict_df), prefix='Сохраняем данные по оборотам после обработки в таблицах')
             df = self.dict_df[file].table
             df_for_check = self.dict_df[file].table_for_check
             df_for_check_2 = df[['Корр_счет',
@@ -283,19 +276,23 @@ class AccountAnalysisProcessor(IFileProcessor):
             # запишем таблицу в словарь
             self.dict_df[file].table_for_check = merged_df
 
-    def rename_columns(self) -> None:
+    def reorder_table_columns(self) -> None:
+        progress_bar(1, 3, prefix='Сортируем столбцы в нужном порядке:')
         list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
         for n in list_lev[::-1]:
             if all(self.pivot_table[n].apply(self._is_accounting_code)):
                 self.pivot_table['Субсчет'] = self.pivot_table[n].copy()
                 break
 
+        progress_bar(2, 3, prefix='Сортируем столбцы в нужном порядке:')
         for p in list_lev:
             if not all(self.pivot_table[p].apply(self._is_accounting_code)):
                 self.pivot_table['Аналитика'] = self.pivot_table['Аналитика'].where(
                     self.pivot_table['Аналитика'] != 'Не_указано', self.pivot_table[p])
                 break
 
+        progress_bar(3, 3, prefix='Сортируем столбцы в нужном порядке:')
         self.pivot_table['Субсчет'] = self.pivot_table.apply(
             lambda row: row['Субсчет'] if (str(row['Субсчет']) != '7') else f"0{row['Субсчет']}",
             axis=1)
+

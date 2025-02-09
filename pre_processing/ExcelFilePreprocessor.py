@@ -15,6 +15,7 @@ from typing import Literal, List
 import openpyxl
 from pathlib import Path
 from config import analysis_fields
+from additional.progress_bar import progress_bar
 
 class ExcelFilePreprocessor:
     @staticmethod
@@ -22,7 +23,8 @@ class ExcelFilePreprocessor:
                               file_type: Literal['account_turnover',
                                                  'account_analysis',
                                                  'account_osv']) -> None:
-        for oFile in excel_files:
+        for i, oFile in enumerate(excel_files):
+            progress_bar(i + 1, len(excel_files), prefix='Предобработка исходных файлов')
             workbook = None
             try:
                 workbook = openpyxl.load_workbook(oFile)

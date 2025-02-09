@@ -5,6 +5,7 @@ from additional.ErrorClasses import NoExcelFilesError
 from basic_processing.FileProcessor import IFileProcessor
 pd.options.mode.copy_on_write = False
 from config import new_names
+from additional.progress_bar import progress_bar
 
 class AccountTurnoverProcessor(IFileProcessor):
 
@@ -15,7 +16,8 @@ class AccountTurnoverProcessor(IFileProcessor):
         Задача данного метода найти такие столбцы и разделить их на дебетовые и кредитовые, добавив к наименованию
         'до' и 'ко' соответственно.
         """
-        for file in self.dict_df:
+        for x, file in enumerate(self.dict_df):
+            progress_bar(x + 1, len(self.dict_df), prefix='Установка специальных заголовков в таблицах')
             # Выгрузим обрабатываемую таблицу из хранилища таблиц
             df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
@@ -100,3 +102,4 @@ class AccountTurnoverProcessor(IFileProcessor):
             df = df.rename(columns=rename_dict)
             # запишем таблицу в словарь
             self.dict_df[file].table = df
+

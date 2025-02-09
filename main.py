@@ -4,12 +4,22 @@ Created on Mon Dec 16 14:42:39 2024
 
 @author: a.karabedyan
 """
-
+from typing import Literal
 from basic_processing.FileProcessorFactory import FileProcessorFactory
 
 def main():
-    file_type = ['account_turnover', 'account_analysis', 'account_osv']
-    processor = FileProcessorFactory.create_processor(file_type[0])
+    file_type: list[Literal['account_turnover', 'account_analysis', 'account_osv']] = ['account_turnover', 'account_analysis', 'account_osv']
+    while True:
+        try:
+            number_register = int(
+                input('Введи номер для обрабатываемого регистра\n0 - Обороты счета\n1 - Анализ счета\n2 - ОСВ:\n '))
+            if number_register in [0, 1, 2]:
+                break
+            else:
+                print("Некорректный ввод. Пожалуйста, введите 0, 1 или 2.")
+        except ValueError:
+            print("Некорректный ввод. Пожалуйста, введите целое число.")
+    processor = FileProcessorFactory.create_processor(file_type[number_register])
     processor.conversion()
     processor.preprocessing()
     processor.general_table_header()
@@ -22,6 +32,7 @@ def main():
     processor.revolutions_after_processing()
     processor.joining_tables()
     processor.shiftable_level()
+    processor.reorder_table_columns()
     processor.unloading_pivot_table()
     processor.process_end()
 
