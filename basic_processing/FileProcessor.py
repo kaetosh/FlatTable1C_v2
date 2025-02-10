@@ -370,8 +370,14 @@ class IFileProcessor:
             # Если таблица с количественными данными, дополним ее столбцами с количеством путем
             # сдвига соответствующего столбца на строку вверх, так как строки с количеством чередуются с денежными значениями
             print('register_fields.analytics=', register_fields.analytics)
+            print('register_fields.quantity=', register_fields.quantity)
+            print('df.columns=', df.columns)
+
             if df[register_fields.analytics].isin(['Количество']).any() or register_fields.quantity in df.columns:
                 print('файл с количеством')
+                print("df[register_fields.analytics].isin(['Количество']).any()=", df[register_fields.analytics].isin(['Количество']).any())
+                print("register_fields.quantity in df.columns=", register_fields.quantity in df.columns)
+                df.to_excel('145.xlsx')
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
 
