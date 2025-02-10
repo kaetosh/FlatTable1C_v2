@@ -12,7 +12,7 @@ def main():
     while True:
         try:
             number_register = int(
-                input('Введи номер для обрабатываемого регистра\n0 - Обороты счета\n1 - Анализ счета\n2 - ОСВ:\n '))
+                input('Введи номер для обрабатываемого регистра и нажми Enter\n0 - Обороты счета\n1 - Анализ счета\n2 - ОСВ:\n '))
             if number_register in [0, 1, 2]:
                 break
             else:

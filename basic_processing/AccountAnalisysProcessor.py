@@ -135,14 +135,31 @@ class AccountAnalysisProcessor(IFileProcessor):
                 del_acc_with_94 = [i for i in acc_with_94 if i != '94.Н']
             del_acc = list(set(del_acc + del_acc_with_94))
 
+
             for i in accounts_without_subaccount:
                 unwanted_subaccounts = [n for n in all_acc_dict if i in n]
                 del_unwanted_subaccounts = [n for n in unwanted_subaccounts if n != i]
                 del_acc = list(set(del_acc + del_unwanted_subaccounts))
 
+
             for i in accounts_without_subaccount:
                 if i in del_acc:
                     del_acc.remove(i)
+
+
+            # Оригинальный столбец с корр.счетами может содержать счета без 0, т.е. не 08, а 8
+            # добавим в список для удаления счетов счета без 0
+            # Создание нового списка
+            list_of_accounts_without_zeros_int = []
+            list_of_accounts_without_zeros_str = []
+            for item in del_acc:
+                # Проверка, является ли элемент целым числом с нулями
+                if item.isdigit() and item.startswith('0') and len(item) > 1:
+                    # Преобразуем строку в целое число и обратно в строку
+                    list_of_accounts_without_zeros_str.append(str(int(item)))
+                    list_of_accounts_without_zeros_int.append((int(item)))
+            del_acc.extend(list_of_accounts_without_zeros_int)
+            del_acc.extend(list_of_accounts_without_zeros_str)
 
             df[register_fields.corresponding_account] = df[register_fields.corresponding_account].apply(
                 lambda x: str(x))

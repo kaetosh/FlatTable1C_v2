@@ -239,11 +239,23 @@ class IFileProcessor:
                                             df[register_fields.analytics].isna() & df['Уровень'].eq(df['Уровень'].shift(1)),
                                             'Количество',
                                             df[register_fields.analytics])
+                # Удалим строки, содержащие значение "Количество" ниже строки с Итого. Предыдущий Код "Количество" ниже Итого проставляет даже в регистрах
+                # без количественных значений
+                # Находим индекс строки, где находится 'Итого'
+                # Проверяем, есть ли 'Итого' в столбце
+                if (df[register_fields.analytics] == 'Итого').any():
+                    # Если 'Итого' существует, получаем индекс
+                    index_total = df[df[register_fields.analytics] == 'Итого'].index[0]
 
-                df[register_fields.analytics] = df[register_fields.analytics].fillna('Не_заполнено')
+                    # Фильтруем DataFrame
+                    df = df[(df.index <= index_total) | ((df.index > index_total) & (df[register_fields.analytics] != 'Количество'))]
+                else:
+                    pass
+
+                df.loc[:, register_fields.analytics] = df[register_fields.analytics].fillna('Не_заполнено')
 
             # Преобразование в строки и добавление ведущего нуля для счетов до 10 (01, 02 и т.д.)
-            df[register_fields.analytics] = df[register_fields.analytics].astype(str).apply(
+            df.loc[:, register_fields.analytics] = df[register_fields.analytics].astype(str).apply(
                 lambda x: f'0{x}' if len(x) == 1 and self._is_accounting_code(x) else x)
 
             # запишем таблицу в словарь
@@ -290,8 +302,6 @@ class IFileProcessor:
 
             # получим максимальный уровень иерархии
             max_level = df['Уровень'].max()
-
-            print('/nmax_level=', max_level)
 
             # пустой файл отправил в специальный список
             if max_level == 0:
@@ -369,14 +379,8 @@ class IFileProcessor:
 
             # Если таблица с количественными данными, дополним ее столбцами с количеством путем
             # сдвига соответствующего столбца на строку вверх, так как строки с количеством чередуются с денежными значениями
-            print('register_fields.analytics=', register_fields.analytics)
-            print('register_fields.quantity=', register_fields.quantity)
-            print('df.columns=', df.columns)
 
             if df[register_fields.analytics].isin(['Количество']).any() or register_fields.quantity in df.columns:
-                print('файл с количеством')
-                print("df[register_fields.analytics].isin(['Количество']).any()=", df[register_fields.analytics].isin(['Количество']).any())
-                print("register_fields.quantity in df.columns=", register_fields.quantity in df.columns)
                 df.to_excel('145.xlsx')
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
@@ -386,9 +390,6 @@ class IFileProcessor:
             if register_fields.quantity in df.columns:
                 df = df[~df[register_fields.quantity].str.contains('Кол.', na=False)]
                 df = df.drop([register_fields.quantity], axis=1)
-
-            print('file=', file)
-            print('df[Уровень].max()', df['Уровень'].max())
 
             for i in range(df['Уровень'].max()):
                 df = df[~((df['Уровень']==i) & (df[register_fields.analytics] == df[f'Level_{i}']) & (i<df['Уровень'].shift(-1)))]
@@ -416,6 +417,7 @@ class IFileProcessor:
             df, sign_1c, register, register_fields, *_, df_check_before_process = self._get_data_from_table_storage(file, self.dict_df)
 
             # Вычисление итоговых значений - свернутые значения сальдо и оборотов - обработанных таблиц
+            df.to_excel('777.xlsx')
             df_check_after_process = pd.DataFrame({
                 register_fields.start_balance_after_processing: [df[register_fields.start_debit_balance_for_rename].sum() - df[register_fields.start_credit_balance_for_rename].sum()],
                 register_fields.turnover_after_processing: [df[register_fields.debit_turnover_for_rename].sum() - df[register_fields.credit_turnover_for_rename].sum()],
