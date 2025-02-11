@@ -27,7 +27,7 @@ class ExcelFileConverter:
         excel_app.Visible = False
         excel_app.DisplayAlerts = False
         for i, file in enumerate(excel_files):
-            progress_bar(i + 1, len(excel_files), prefix='Пересохранение исходных файлов')
+            progress_bar(i + 1, len(excel_files), prefix=f'Пересохранение исходных файлов: {file.name}')
             ExcelFileConverter.convert_file(excel_app, file)
         excel_app.Quit()
     @staticmethod

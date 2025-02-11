@@ -24,7 +24,7 @@ class ExcelFilePreprocessor:
                                                  'account_analysis',
                                                  'account_osv']) -> None:
         for i, oFile in enumerate(excel_files):
-            progress_bar(i + 1, len(excel_files), prefix='Предобработка исходных файлов')
+            progress_bar(i + 1, len(excel_files), prefix=f'Предобработка исходных файлов: {oFile.name}')
             workbook = None
             try:
                 workbook = openpyxl.load_workbook(oFile)

@@ -79,7 +79,8 @@ class IFileProcessor:
         Проверяет, является ли значение бухгалтерским счетом. На вход - строка.
         """
         if value:
-            if str(value) == "000":
+            #if str(value) == "000":
+            if str(value) in ['00', '000', '10.ДР']:
                 return True
             try:
                 parts = str(value).split('.')
@@ -160,7 +161,7 @@ class IFileProcessor:
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         for x, oFile in enumerate(self.excel_files):
-            progress_bar(x + 1, len(self.excel_files), prefix='Установка общей шапки в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Установка общей шапки в таблицах: {oFile.name}')
             df = pd.read_excel(oFile)
 
             # Перечень полей регистра 1С
@@ -210,7 +211,7 @@ class IFileProcessor:
         Шапка таблицы дополняется в зависимости от типа регистра 1С. (в переопределенных методах)
         """
         for x, file in enumerate(self.dict_df):
-            progress_bar(x + 1, len(self.excel_files), prefix='Установка специальных заголовков в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Установка специальных заголовков в таблицах: {file}')
             df, *_ = self._get_data_from_table_storage(file, self.dict_df)
             df = df.loc[:, df.columns.notna()]
             df.columns = df.columns.astype(str)
@@ -225,7 +226,7 @@ class IFileProcessor:
         Такие пропущенные значения заполняются "Не_заполнено".
         """
         for x, file in enumerate(self.dict_df):
-            progress_bar(x + 1, len(self.excel_files), prefix='Заполнение пропущенных значений в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Заполнение пропущенных значений в таблицах: {file}')
             df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # Для выгрузок с полем "Количество"
@@ -294,7 +295,7 @@ class IFileProcessor:
         Договор поставки №1) будут удалены (метод lines_delete).
         """
         for x, file in enumerate(self.dict_df):
-            progress_bar(x + 1, len(self.excel_files), prefix='Установка горизонтальной структуры в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Установка горизонтальной структуры в таблицах: {file}')
             df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # Инициализация переменной для хранения предыдущего значения
@@ -331,7 +332,7 @@ class IFileProcessor:
         сравнить их с данными по оборотам после обработки с целью убедиться в корректности обработки
         """
         for x, file in enumerate(self.dict_df):
-            progress_bar(x + 1, len(self.excel_files), prefix='Сохраняем данные по оборотам до обработки в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Сохраняем данные по оборотам до обработки в таблицах: {file}')
             df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
             existing_columns = [i for i in df.columns if i in register_fields.get_attributes_by_suffix('_for_rename')]
 
@@ -364,7 +365,7 @@ class IFileProcessor:
         Метод их удаляет.
         """
         for x, file in enumerate(self.dict_df):
-            progress_bar(x + 1, len(self.excel_files), prefix='Удаляем строки с дублирующими оборотами в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Удаляем строки с дублирующими оборотами в таблицах: {file}')
             df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(file, self.dict_df)
 
             # Получим список столбцов с сальдо и оборотами и оставим только те, которые есть в таблице
@@ -381,7 +382,6 @@ class IFileProcessor:
             # сдвига соответствующего столбца на строку вверх, так как строки с количеством чередуются с денежными значениями
 
             if df[register_fields.analytics].isin(['Количество']).any() or register_fields.quantity in df.columns:
-                df.to_excel('145.xlsx')
                 for i in desired_order:
                     df[f'Количество_{i}'] = df[i].shift(-1)
 
@@ -398,7 +398,7 @@ class IFileProcessor:
             df = df[~df[register_fields.analytics].isin(exclude_values)].copy()
 
             # УТОЧНИТЬ, НЕТ ЛИ ЭТОЙ ОПЕРАЦИИ НА ЭТАПЕ СПЕЦЗАГОЛОВКОВ
-            # df = df.rename(columns={'Счет': 'Субконто'})
+            df = df.rename(columns={'Счет': 'Субконто'})
             df.drop('Уровень', axis=1, inplace=True)
 
             # отберем только те строки, в которых хотя бы в одном из столбцов, определенных в existing_columns, есть непропущенные значения (не NaN)
@@ -413,11 +413,10 @@ class IFileProcessor:
         данные по оборотам после обработки и отклонениями между ними.
         """
         for x, file in enumerate(self.dict_df):
-            progress_bar(x + 1, len(self.excel_files), prefix='Сохраняем данные по оборотам после обработки в таблицах')
+            progress_bar(x + 1, len(self.excel_files), prefix=f'Сохраняем данные по оборотам после обработки в таблицах: {file}')
             df, sign_1c, register, register_fields, *_, df_check_before_process = self._get_data_from_table_storage(file, self.dict_df)
 
             # Вычисление итоговых значений - свернутые значения сальдо и оборотов - обработанных таблиц
-            df.to_excel('777.xlsx')
             df_check_after_process = pd.DataFrame({
                 register_fields.start_balance_after_processing: [df[register_fields.start_debit_balance_for_rename].sum() - df[register_fields.start_credit_balance_for_rename].sum()],
                 register_fields.turnover_after_processing: [df[register_fields.debit_turnover_for_rename].sum() - df[register_fields.credit_turnover_for_rename].sum()],
@@ -462,12 +461,13 @@ class IFileProcessor:
         """
         Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
         """
-        for j in range(5):
-            progress_bar(j + 1, 5, prefix='Выравниваем столбцы со счетами в таблицах')
+        for j in range(10):
+            progress_bar(j + 1, 10, prefix='Выравниваем столбцы со счетами в таблицах')
             list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
             for i in list_lev:
                 # если в столбце есть и субсчет и субконто, нужно выравнивать столбцы
                 if self.pivot_table[i].apply(self._is_accounting_code).nunique() == 2:
+                    #print('шаг', j)
                     lm = int(i.split('_')[-1])  # получим его хвостик столбца, в котором есть и субсчет и субконто, например Level_2, значит 2
                     # получим перечень столбцов, которые бум двигать (первый - это столбец, где есть и субсчет и субконто)
                     new_list_lev = list_lev[lm:]
@@ -475,7 +475,7 @@ class IFileProcessor:
                     self.pivot_table[new_list_lev] = self.pivot_table.apply(
                         lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
                             x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1)
-                    break
+                    #break
 
     def reorder_table_columns(self) -> None:
         """

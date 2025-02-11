@@ -49,7 +49,7 @@ def progress_bar(iteration, total, prefix='', length=40, fill='█', print_end='
     :param print_end: Символ в конце строки (по умолчанию — новая строка).
     """
     # Убедимся, что префикс занимает ровно 55 символов
-    fixed_prefix = (prefix + ' ' * 55)[:55]
+    fixed_prefix = (prefix + ' ' * 60)[:60]
 
     percent = "{0:.1f}".format(100 * (iteration / float(total)))
     filled_length = int(length * iteration // total)
