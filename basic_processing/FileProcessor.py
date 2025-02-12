@@ -79,8 +79,7 @@ class IFileProcessor:
         Проверяет, является ли значение бухгалтерским счетом. На вход - строка.
         """
         if value:
-            #if str(value) == "000":
-            if str(value) in ['00', '000', '10.ДР']:
+            if str(value) == "000":
                 return True
             try:
                 parts = str(value).split('.')
