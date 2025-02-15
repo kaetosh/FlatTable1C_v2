@@ -46,7 +46,7 @@ class AccountAnalysisProcessor(IFileProcessor):
         # Запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
-    @catch_and_log_exceptions(prefix='Установка столбца с корреспондирубщим счетом в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка столбца с корр счетом в таблицах:')
     def corr_account_col(self) -> None:
         df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(self.file, self.dict_df)
 
@@ -150,7 +150,7 @@ class AccountAnalysisProcessor(IFileProcessor):
                 del_acc.remove(i)
 
 
-        # Оригинальный столбец с корр.счетами может содержать счета без 0, т.е. не 08, а 8
+        # Оригинальный столбец с корр счетами может содержать счета без 0, то есть не 08, а 8
         # добавим в список для удаления счетов счета без 0
         # Создание нового списка
         list_of_accounts_without_zeros_int = []

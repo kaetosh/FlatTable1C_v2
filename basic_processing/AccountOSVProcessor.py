@@ -4,7 +4,7 @@
 """
 
 from basic_processing.FileProcessor import IFileProcessor
-from additional.decorators import catch_and_log_exceptions
+from additional.decorators import catch_and_log_exceptions, logger
 
 class AccountOSVProcessor(IFileProcessor):
     @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
@@ -40,3 +40,4 @@ class AccountOSVProcessor(IFileProcessor):
 
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
+

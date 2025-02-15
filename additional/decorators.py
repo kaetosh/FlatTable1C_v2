@@ -5,10 +5,16 @@ Created on Thu Feb 13 22:25:32 2025
 @author: a.karabedyan
 """
 import functools
+import sys
+from pathlib import Path
+from loguru import logger
+import pandas as pd
 from additional.progress_bar import progress_bar
 from additional.ErrorClasses import ContinueIteration
 
-import functools
+# Настраиваем логгер для вывода только сообщений уровня ERROR
+logger.remove()  # Удаляем стандартный обработчик
+logger.add(sys.stderr, level="ERROR")  # Добавляем новый обработчик для вывода в консоль
 
 def catch_and_log_exceptions(prefix=''):
     """
@@ -22,7 +28,14 @@ def catch_and_log_exceptions(prefix=''):
         @functools.wraps(method)
         def wrapper(self, *args, **kwargs):
             files_to_process = list(self.dict_df.keys()) or self.excel_files
-            for x, self.file in enumerate(files_to_process):
+            for x, file in enumerate(files_to_process):
+                # Устанавливаем self.file или self.oFile в зависимости от типа
+                if isinstance(file, str):
+                    self.file = file  # Если это строка
+                elif isinstance(file, Path):
+                    self.oFile = file  # Если это объект Path
+                else:
+                    continue  # Пропускаем, если тип не поддерживается
                 progress_bar(x + 1, len(files_to_process), prefix=f'{prefix} {self.file}')
                 while True:
                     try:
@@ -31,12 +44,25 @@ def catch_and_log_exceptions(prefix=''):
                     except ContinueIteration:
                         # Исключение для продолжения цикла
                         break  # Переход к следующему файлу
-                    except Exception as ee:
-                        #error_message = f"Ошибка при обработке {self.file}: {str(ee)}"
-                        #print('\n', error_message)
-                        self.empty_files.append(self.file)
-                        if self.file in self.dict_df:
-                            del self.dict_df[self.file]
+                    except pd.errors.EmptyDataError:
+                        logger.debug(f"Файл {file} пуст.")
+                        self.empty_files.append(file)
+                        break
+                    except pd.errors.ParserError as e:
+                        logger.debug(f"Ошибка парсинг в файле {file}: {e}")
+                        self.empty_files.append(file)
+                        break
+                    except KeyError as e:
+                        logger.debug(f"Столбец не найден в файле {file}: {e}")
+                        self.empty_files.append(file)
+                        break
+                    except FileNotFoundError:
+                        logger.debug(f"Файл не найден: {file}")
+                        self.empty_files.append(file)
+                        break
+                    except Exception as e:
+                        logger.debug(f"Неожиданная ошибка в файле {file}: {str(e)}")
+                        self.empty_files.append(file)
                         break  # Переход к следующему файлу
         return wrapper
     return decorator

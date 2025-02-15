@@ -6,13 +6,13 @@ Created on Mon Dec 16 14:32:00 2024
 """
 
 import os
-from typing import List, Dict, Literal, Tuple
+from typing import List, Dict, Literal, Tuple, Optional
 import pandas as pd
 pd.options.mode.copy_on_write = False
 import numpy as np
 from pathlib import Path
 from additional.progress_bar import progress_bar
-from additional.decorators import catch_and_log_exceptions
+from additional.decorators import catch_and_log_exceptions, logger
 from basic_processing.Register1C import Register1c, FieldsRegister, TableStorage
 from config import osv_fields, turnover_fields, analysis_fields, exclude_values
 from additional.ErrorClasses import NoExcelFilesError, ContinueIteration
@@ -41,7 +41,7 @@ class IFileProcessor:
         self.converter: ExcelFileConverter = ExcelFileConverter() # класс для пересохранения файлов (регистров)
         self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor() # класс для предварительной обработки файлов (регистров)
         self.register: Register1c = self._get_fields_register() # класс с полями обрабатываемых регистров
-        self.oFile: Path = None # путь к текущему файлу в обработке
+        self.oFile: Optional[Path] = None # путь к текущему файлу в обработке
         self.file: str = "" # имя текущего файла в обработке
 
     def _get_fields_register(self) -> Register1c:
@@ -151,7 +151,7 @@ class IFileProcessor:
         Обновление атрибута self.excel_files так как .xls пересохранены в .xlsx
         """
         self.excel_files = self._get_path_excel_files()
-        self.preprocessor.preprocessor_openpyxl(self.excel_files, self.file_type)
+        self.preprocessor.preprocessor_openpyxl(self.excel_files)
 
     @catch_and_log_exceptions(prefix='Установка общей шапки в таблицах:')
     def general_table_header(self) -> None:
@@ -164,7 +164,7 @@ class IFileProcessor:
         if not self.excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
 
-        df = pd.read_excel(self.file)
+        df = pd.read_excel(self.oFile)
 
         # Перечень полей регистра 1С
         target_values = {i.version_1c_id for i in [self.register.upp, self.register.notupp]}
@@ -192,25 +192,23 @@ class IFileProcessor:
             df.columns.values[1] = 'Курсив'
 
             if df['Уровень'].max() == 0:
-                self.empty_files.append(self.file.name)
+                self.empty_files.append(self.oFile.name)
                 raise ContinueIteration
 
             sign_1c = self.register.get_outer_attribute_name_by_value(first_valid_value)
             register_fields = getattr(self.register, sign_1c)
             # Столбец с названием файла (названием компании)
-            df[register_fields.file_name] = self.file.name
+            df[register_fields.file_name] = self.oFile.name
             # запишем таблицу в словарь
 
             if first_valid_value:
-                self.dict_df[self.file.name] = TableStorage(table=df, register=self.register, sign_1C=sign_1c)
-
-
+                self.dict_df[self.oFile.name] = TableStorage(table=df, register=self.register, sign_1C=sign_1c)
             else:
                 # Названия пустых или проблемных файлов сохраним отдельно
-                self.empty_files.append(self.file.name)
+                self.empty_files.append(self.oFile.name)
         else:
             # Названия пустых или проблемных файлов сохраним отдельно
-            self.empty_files.append(self.file.name)
+            self.empty_files.append(self.oFile.name)
 
     @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
     def special_table_header(self) -> None:
@@ -247,17 +245,14 @@ class IFileProcessor:
                                         'Количество',
                                         df[register_fields.analytics])
             # Удалим строки, содержащие значение "Количество" ниже строки с Итого. Предыдущий Код "Количество" ниже Итого проставляет даже в регистрах
-            # без количественных значений
-            # Находим индекс строки, где находится 'Итого'
-            # Проверяем, есть ли 'Итого' в столбце
+            # Без количественных значений.
+            # Найдем индекс строки, где находится 'Итого'.
+            # Проверяем, есть ли 'Итого' в столбце.
             if (df[register_fields.analytics] == 'Итого').any():
                 # Если 'Итого' существует, получаем индекс
                 index_total = df[df[register_fields.analytics] == 'Итого'].index[0]
-
                 # Фильтруем DataFrame
                 df = df[(df.index <= index_total) | ((df.index > index_total) & (df[register_fields.analytics] != 'Количество'))]
-            else:
-                pass
 
             df.loc[:, register_fields.analytics] = df[register_fields.analytics].fillna('Не_заполнено')
 
@@ -329,7 +324,7 @@ class IFileProcessor:
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
-    @catch_and_log_exceptions
+    #@catch_and_log_exceptions
     def corr_account_col(self) -> None:
         pass
 
@@ -411,6 +406,7 @@ class IFileProcessor:
 
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
+        logger.debug(f'5={df.columns}')
 
 
     @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах:')
@@ -467,6 +463,8 @@ class IFileProcessor:
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     self.pivot_table_check = pd.concat([self.pivot_table_check, df.reset_index(drop=True)], ignore_index=True)
 
+        logger.debug(f'6={self.pivot_table.columns}')
+
 
     def shiftable_level(self) -> None:
         """
@@ -486,6 +484,7 @@ class IFileProcessor:
                         self.pivot_table[new_list_lev] = self.pivot_table.apply(
                             lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
                                 x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1)
+            logger.debug(f'7={self.pivot_table.columns}')
                         #break
 
     def reorder_table_columns(self) -> None:
@@ -532,6 +531,7 @@ class IFileProcessor:
             # Используем reindex для сортировки DataFrame
             progress_bar(4, 4, prefix='Сортируем столбцы в нужном порядке:')
             self.pivot_table = self.pivot_table.reindex(columns=desired_order).copy()
+            logger.debug(f'8={self.pivot_table.columns}')
 
 
     def unloading_pivot_table(self) -> None:
@@ -549,5 +549,8 @@ class IFileProcessor:
     def process_end(self) -> None:
         if self.empty_files:
             print('Необработанные файлы:', self.empty_files)
-        print('Закончили обработку')
-        input('Можно закрыть программу')
+        file_name_pivot_table = f"_Pivot_{self.file_type}.xlsx"
+        current_directory = Path('.')
+        if (current_directory / file_name_pivot_table).is_file():
+            print(f"Файл '{file_name_pivot_table}' в исходной папке.")
+        input('Закончили обработку, можно закрыть программу.')

@@ -11,7 +11,7 @@ Created on Mon Dec 16 16:35:32 2024
 - добавление столбца с признаком курсивного шрифта (актуально для анализа счета в УПП, строки с курсивом
 это промежуточные итоги, для исключения в сводном файле)
 """
-from typing import Literal, List
+from typing import List
 import openpyxl
 from pathlib import Path
 from config import analysis_fields
@@ -19,10 +19,7 @@ from additional.progress_bar import progress_bar
 
 class ExcelFilePreprocessor:
     @staticmethod
-    def preprocessor_openpyxl(excel_files: List[Path],
-                              file_type: Literal['account_turnover',
-                                                 'account_analysis',
-                                                 'account_osv']) -> None:
+    def preprocessor_openpyxl(excel_files: List[Path]) -> None:
         for i, oFile in enumerate(excel_files):
             progress_bar(i + 1, len(excel_files), prefix=f'Предобработка исходных файлов: {oFile.name}')
             workbook = None
@@ -44,7 +41,6 @@ class ExcelFilePreprocessor:
                 cell = sheet.cell(row=row_index, column=1)
                 cell.value = sheet.row_dimensions[row_index].outline_level
             # Столбец с признаком курсива
-            # if file_type == 'account_analysis':
             sheet.insert_cols(idx=2)
             for row in sheet.iter_rows(values_only=True):
                 found_value = next((value for value in [analysis_fields.upp.version_1c_id,

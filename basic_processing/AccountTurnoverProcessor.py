@@ -5,7 +5,7 @@ from additional.ErrorClasses import NoExcelFilesError
 from basic_processing.FileProcessor import IFileProcessor
 pd.options.mode.copy_on_write = False
 from config import new_names
-from additional.decorators import catch_and_log_exceptions
+from additional.decorators import catch_and_log_exceptions, logger
 
 class AccountTurnoverProcessor(IFileProcessor):
     @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
@@ -100,4 +100,5 @@ class AccountTurnoverProcessor(IFileProcessor):
         df = df.rename(columns=rename_dict)
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
+        logger.debug(f'10={df.columns}')
 
