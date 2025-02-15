@@ -24,7 +24,6 @@ class AccountAnalysisProcessor(IFileProcessor):
             self.dict_df[self.file].table_type_connection = df_type_connection
 
         # Проверка на пропуски и условия для заполнения
-        print('\nЭТО ПЕРЕД ОШИБКОЙ файл=', self.file)
         mask = (
                 df[register_fields.analytics].isna() &
                 ~df[register_fields.corresponding_account].apply(self._is_accounting_code) &
@@ -297,8 +296,6 @@ class AccountAnalysisProcessor(IFileProcessor):
         self.dict_df[self.file].table_for_check = merged_df
 
     def reorder_table_columns(self) -> None:
-        print('Обрабатываемые файлы=', self.dict_df.keys())
-        print('левые файлы=', self.empty_files)
         if not self.pivot_table.empty:
             progress_bar(1, 3, prefix='Сортируем столбцы в нужном порядке:')
             list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]

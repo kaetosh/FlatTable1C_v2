@@ -204,6 +204,7 @@ class IFileProcessor:
             if first_valid_value:
                 self.dict_df[self.file.name] = TableStorage(table=df, register=self.register, sign_1C=sign_1c)
 
+
             else:
                 # Названия пустых или проблемных файлов сохраним отдельно
                 self.empty_files.append(self.file.name)
@@ -266,6 +267,7 @@ class IFileProcessor:
 
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
+
 
     @catch_and_log_exceptions(prefix='Установка горизонтальной структуры в таблицах:')
     def horizontal_structure(self) -> None:
@@ -410,6 +412,7 @@ class IFileProcessor:
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
+
     @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах:')
     def revolutions_after_processing(self) -> None:
         """
@@ -464,6 +467,7 @@ class IFileProcessor:
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     self.pivot_table_check = pd.concat([self.pivot_table_check, df.reset_index(drop=True)], ignore_index=True)
 
+
     def shiftable_level(self) -> None:
         """
         Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
@@ -475,7 +479,6 @@ class IFileProcessor:
                 for i in list_lev:
                     # если в столбце есть и субсчет и субконто, нужно выравнивать столбцы
                     if self.pivot_table[i].apply(self._is_accounting_code).nunique() == 2:
-                        #print('шаг', j)
                         lm = int(i.split('_')[-1])  # получим его хвостик столбца, в котором есть и субсчет и субконто, например Level_2, значит 2
                         # получим перечень столбцов, которые бум двигать (первый - это столбец, где есть и субсчет и субконто)
                         new_list_lev = list_lev[lm:]
@@ -521,6 +524,9 @@ class IFileProcessor:
             level_columns.sort(key=lambda x: int(x.split('_')[1]))
             # Формируем итоговый порядок необходимых столбцов
             desired_order = [register_fields.file_name, register_fields.analytics] + desired_order + level_columns
+
+            if register_fields.type_connection in self.pivot_table.columns:
+                desired_order = desired_order + [register_fields.type_connection]
             # Отбор существующих столбцов
             desired_order = [col for col in desired_order if col in self.pivot_table.columns]
             # Используем reindex для сортировки DataFrame
