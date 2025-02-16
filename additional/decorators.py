@@ -36,7 +36,7 @@ def catch_and_log_exceptions(prefix=''):
                     self.oFile = file  # Если это объект Path
                 else:
                     continue  # Пропускаем, если тип не поддерживается
-                progress_bar(x + 1, len(files_to_process), prefix=f'{prefix} {self.file}')
+                progress_bar(x + 1, len(files_to_process), prefix=prefix)
                 while True:
                     try:
                         method(self, *args, **kwargs)  # Вызов метода

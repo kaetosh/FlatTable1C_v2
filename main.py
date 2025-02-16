@@ -5,9 +5,11 @@ Created on Mon Dec 16 14:42:39 2024
 @author: a.karabedyan
 """
 from typing import Literal
+from config import START_TEXT
 from basic_processing.FileProcessorFactory import FileProcessorFactory
 
 def main():
+    print(START_TEXT)
     file_type: list[Literal['account_turnover', 'account_analysis', 'account_osv']] = ['account_turnover', 'account_analysis', 'account_osv']
     while True:
         try:
