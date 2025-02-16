@@ -11,10 +11,10 @@ import pandas as pd
 pd.options.mode.copy_on_write = False
 import numpy as np
 from pathlib import Path
-from additional.progress_bar import progress_bar
+from tqdm import tqdm
 from additional.decorators import catch_and_log_exceptions, logger
 from basic_processing.Register1C import Register1c, FieldsRegister, TableStorage
-from config import osv_fields, turnover_fields, analysis_fields, exclude_values
+from config import osv_fields, turnover_fields, analysis_fields, exclude_values, max_desc_length
 from additional.ErrorClasses import NoExcelFilesError, ContinueIteration
 from pre_processing.ExcelFileConverter import ExcelFileConverter
 from pre_processing.ExcelFilePreprocessor import ExcelFilePreprocessor
@@ -153,7 +153,7 @@ class IFileProcessor:
         self.excel_files = self._get_path_excel_files()
         self.preprocessor.preprocessor_openpyxl(self.excel_files)
 
-    @catch_and_log_exceptions(prefix='Установка общей шапки в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка общей шапки в таблицах')
     def general_table_header(self) -> None:
         """
         Функция в цикле проходит по каждому файлу, загружает его в pandas. DataFrame.
@@ -210,7 +210,7 @@ class IFileProcessor:
             # Названия пустых или проблемных файлов сохраним отдельно
             self.empty_files.append(self.oFile.name)
 
-    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах')
     def special_table_header(self) -> None:
         """
         Метод переопределяется в классах для ОСВ и Обороты счета, так как имена их столбцов отличаются от Анализа счета
@@ -264,7 +264,7 @@ class IFileProcessor:
         self.dict_df[self.file].table = df
 
 
-    @catch_and_log_exceptions(prefix='Установка горизонтальной структуры в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка горизонтальной структуры в таблицах')
     def horizontal_structure(self) -> None:
         """
         Используется для заполнения значений из верхних уровней на этапе превращения таблицы
@@ -328,7 +328,7 @@ class IFileProcessor:
     def corr_account_col(self) -> None:
         pass
 
-    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам до обработки в таблицах:')
+    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам до обработки в таблицах')
     def revolutions_before_processing(self) -> None:
         """
         Сохраняет в хранилище таблиц данные по оборотам до обработки, чтобы в дальнейшем
@@ -358,7 +358,7 @@ class IFileProcessor:
         # запишем таблицу в словарь
         self.dict_df[self.file].table_for_check = df_for_check
 
-    @catch_and_log_exceptions(prefix='Удаляем строки с дублирующими оборотами в таблицах:')
+    @catch_and_log_exceptions(prefix='Удаляем строки с дублирующими оборотами в таблицах')
     def lines_delete(self) -> None:
         """
         Метод для ОСВ и Оборотов счета. Для анализа сета метод переопределен.
@@ -409,7 +409,7 @@ class IFileProcessor:
         logger.debug(f'5={df.columns}')
 
 
-    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах:')
+    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах')
     def revolutions_after_processing(self) -> None:
         """
         Добавляет к таблице с оборотами до обработки, созданной методом revolutions_before_processing,
@@ -438,7 +438,6 @@ class IFileProcessor:
         # Запись таблицы в хранилище таблиц
         self.dict_df[self.file].table_for_check = pivot_df_check
 
-
     def joining_tables(self) -> None:
         """
         Объединяет все таблицы друг под другом.
@@ -451,41 +450,47 @@ class IFileProcessor:
 
         # Объединяем таблицы с обновлением прогресс-бара
         if list_tables_for_joining:
-            for x, df in enumerate(list_tables_for_joining):
-                progress_bar(x + 1, total_tables, prefix='Объединение таблиц:')
+            for df in tqdm(list_tables_for_joining, total=total_tables, desc='Объединение таблиц'.ljust(max_desc_length)):
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     self.pivot_table = pd.concat([self.pivot_table, df.reset_index(drop=True)], ignore_index=True)
 
         # Объединяем таблицы для проверки с обновлением прогресс-бара
+        total_check_tables = len(list_tables_check_for_joining)
         if list_tables_check_for_joining:
-            for x, df in enumerate(list_tables_check_for_joining):
-                progress_bar(x + 1, total_tables, prefix='Объединение таблиц для проверки:')
+            for df in tqdm(list_tables_check_for_joining, total=total_check_tables,
+                           desc='Объединение таблиц для проверки'.ljust(max_desc_length)):
                 if isinstance(df, pd.DataFrame) and not df.empty:
-                    self.pivot_table_check = pd.concat([self.pivot_table_check, df.reset_index(drop=True)], ignore_index=True)
-
-        logger.debug(f'6={self.pivot_table.columns}')
-
+                    self.pivot_table_check = pd.concat([self.pivot_table_check, df.reset_index(drop=True)],
+                                                       ignore_index=True)
 
     def shiftable_level(self) -> None:
         """
         Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
         """
         if not self.pivot_table.empty:
-            for j in range(10):
-                progress_bar(j + 1, 10, prefix='Выравниваем столбцы со счетами в таблицах')
-                list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
-                for i in list_lev:
-                    # если в столбце есть и субсчет и субконто, нужно выравнивать столбцы
+            list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
+            continue_shifting = True
+            iteration = 0  # Переменная для отслеживания номера итерации
+
+            while continue_shifting:
+                continue_shifting = False
+                iteration += 1  # Увеличиваем номер итерации
+
+                # Обновляем описание прогресс-бара с номером итерации
+                desc = f"Выравниваем столбцы со счетами в таблицах (итерация {iteration})".ljust(
+                    max_desc_length)
+
+                for i in tqdm(list_lev, desc=desc):
+                    # Если в столбце есть и субсчет, и субконто, нужно выравнивать столбцы
                     if self.pivot_table[i].apply(self._is_accounting_code).nunique() == 2:
-                        lm = int(i.split('_')[-1])  # получим его хвостик столбца, в котором есть и субсчет и субконто, например Level_2, значит 2
-                        # получим перечень столбцов, которые бум двигать (первый - это столбец, где есть и субсчет и субконто)
+                        lm = int(i.split('_')[-1])  # Получим его хвостик столбца
                         new_list_lev = list_lev[lm:]
-                        # сдвигаем:
+                        # Сдвигаем:
                         self.pivot_table[new_list_lev] = self.pivot_table.apply(
                             lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
-                                x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1)
-            logger.debug(f'7={self.pivot_table.columns}')
-                        #break
+                                x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1
+                        )
+                        continue_shifting = True  # Устанавливаем флаг, что сдвиг был произведен
 
     def reorder_table_columns(self) -> None:
         """
@@ -493,46 +498,44 @@ class IFileProcessor:
         """
         if not self.pivot_table.empty:
             # Получим список столбцов с сальдо и оборотами
-            progress_bar(1, 4, prefix='Сортируем столбцы в нужном порядке:')
-            register_fields = self._get_fields_register().upp # upp или notupp без разницы, поля одинаковые
-            desired_order = register_fields.get_attributes_by_suffix('_for_rename')
+            with tqdm(total=4, desc='Сортируем столбцы в нужном порядке'.ljust(max_desc_length), unit='it') as pbar:
+                register_fields = self._get_fields_register().upp  # upp или notupp без разницы, поля одинаковые
+                desired_order = register_fields.get_attributes_by_suffix('_for_rename')
+                pbar.update(1)
 
-            # Находим столбцы в таблице, заканчивающиеся на '_до' и '_ко'
-            progress_bar(2, 4, prefix='Сортируем столбцы в нужном порядке:')
-            do_columns = sorted(self.pivot_table.filter(regex='_до$').columns.tolist())
-            ko_columns = sorted(self.pivot_table.filter(regex='_ко$').columns.tolist())
+                # Находим столбцы в таблице, заканчивающиеся на '_до' и '_ко'
+                do_columns = sorted(self.pivot_table.filter(regex='_до').columns.tolist())
+                ko_columns = sorted(self.pivot_table.filter(regex='_ко').columns.tolist())
+                pbar.update(1)
 
-            # Функция для вставки столбцов
-            def insert_columns(columns, reference_column):
-                if columns:
-                    try:
-                        ind_after = desired_order.index(reference_column) + 1
-                        desired_order[ind_after:ind_after] = columns
-                    except ValueError:
-                        raise NoExcelFilesError(f'Column {reference_column} not found in desired_order.')
+                # Функция для вставки столбцов
+                def insert_columns(columns, reference_column):
+                    if columns:
+                        try:
+                            ind_after = desired_order.index(reference_column) + 1
+                            desired_order[ind_after:ind_after] = columns
+                        except ValueError:
+                            raise NoExcelFilesError(f'Column {reference_column} not found in desired_order.')
 
+                # Вставляем столбцы с дебетовыми и кред оборотами в список заголовков
+                insert_columns(do_columns, register_fields.debit_quantity_turnover_for_rename)
+                insert_columns(ko_columns, register_fields.credit_quantity_turnover_for_rename)
+                pbar.update(1)
 
-            # Вставляем столбцы с lt, и кред оборотами в список заголовков
-            progress_bar(3, 4, prefix='Сортируем столбцы в нужном порядке:')
-            insert_columns(do_columns, register_fields.debit_quantity_turnover_for_rename)
-            insert_columns(ko_columns, register_fields.credit_quantity_turnover_for_rename)
+                # Отберем столбцы c "Level_"
+                level_columns = [col for col in self.pivot_table.columns if 'Level_' in col]
+                # Сортируем столбцы с Level_ по числовому значению в их названиях
+                level_columns.sort(key=lambda x: int(x.split('_')[1]))
+                # Формируем итоговый порядок необходимых столбцов
+                desired_order = [register_fields.file_name, register_fields.analytics] + desired_order + level_columns
 
-            # Отберем столбцы c "Level_"
-            level_columns = [col for col in self.pivot_table.columns if 'Level_' in col]
-            # Сортируем столбцы с Level_ по числовому значению в их названиях
-            level_columns.sort(key=lambda x: int(x.split('_')[1]))
-            # Формируем итоговый порядок необходимых столбцов
-            desired_order = [register_fields.file_name, register_fields.analytics] + desired_order + level_columns
-
-            if register_fields.type_connection in self.pivot_table.columns:
-                desired_order = desired_order + [register_fields.type_connection]
-            # Отбор существующих столбцов
-            desired_order = [col for col in desired_order if col in self.pivot_table.columns]
-            # Используем reindex для сортировки DataFrame
-            progress_bar(4, 4, prefix='Сортируем столбцы в нужном порядке:')
-            self.pivot_table = self.pivot_table.reindex(columns=desired_order).copy()
-            logger.debug(f'8={self.pivot_table.columns}')
-
+                if register_fields.type_connection in self.pivot_table.columns:
+                    desired_order = desired_order + [register_fields.type_connection]
+                # Отбор существующих столбцов
+                desired_order = [col for col in desired_order if col in self.pivot_table.columns]
+                # Используем reindex для сортировки DataFrame
+                self.pivot_table = self.pivot_table.reindex(columns=desired_order).copy()
+                pbar.update(1)
 
     def unloading_pivot_table(self) -> None:
         """
@@ -541,10 +544,12 @@ class IFileProcessor:
         if not self.pivot_table.empty:
             folder_path_summary_files = f"_Pivot_{self.file_type}.xlsx"
             with pd.ExcelWriter(folder_path_summary_files) as writer:
-                progress_bar(1, 2, prefix='Выгрузка сводной таблицы:')
-                self.pivot_table.to_excel(writer, sheet_name='Свод', index=False)
-                progress_bar(2, 2, prefix='Выгрузка сводной таблицы:')
-                self.pivot_table_check.to_excel(writer, sheet_name='Сверка', index=False)
+                # Используем tqdm для отслеживания прогресса выгрузки
+                for step in tqdm(range(2), desc='Выгрузка сводной таблицы'.ljust(max_desc_length), unit='it'):
+                    if step == 0:
+                        self.pivot_table.to_excel(writer, sheet_name='Свод', index=False)
+                    elif step == 1:
+                        self.pivot_table_check.to_excel(writer, sheet_name='Сверка', index=False)
 
     def process_end(self) -> None:
         if self.empty_files:

@@ -4,10 +4,10 @@
 """
 
 from basic_processing.FileProcessor import IFileProcessor
-from additional.decorators import catch_and_log_exceptions, logger
+from additional.decorators import catch_and_log_exceptions
 
 class AccountOSVProcessor(IFileProcessor):
-    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах')
     def special_table_header(self) -> None:
         # Выгрузим обрабатываемую таблицу из хранилища таблиц
         df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(self.file, self.dict_df)

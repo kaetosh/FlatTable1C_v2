@@ -2,12 +2,12 @@ import pandas as pd
 from basic_processing.FileProcessor import IFileProcessor
 pd.options.mode.copy_on_write = False
 import numpy as np
-from config import exclude_values, accounts_without_subaccount
-from additional.progress_bar import progress_bar
+from config import exclude_values, accounts_without_subaccount, max_desc_length
+from tqdm import tqdm
 from additional.decorators import catch_and_log_exceptions
 
 class AccountAnalysisProcessor(IFileProcessor):
-    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
+    @catch_and_log_exceptions(prefix='Заполнение пропущенных значений в таблицах')
     def handle_missing_values(self):
         df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(self.file, self.dict_df)
 
@@ -46,7 +46,7 @@ class AccountAnalysisProcessor(IFileProcessor):
         # Запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
-    @catch_and_log_exceptions(prefix='Установка столбца с корр счетом в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка столбца с корр счетом в таблицах')
     def corr_account_col(self) -> None:
         df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(self.file, self.dict_df)
 
@@ -66,7 +66,7 @@ class AccountAnalysisProcessor(IFileProcessor):
         # Запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
-    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам до обработки в таблицах:')
+    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам до обработки в таблицах')
     def revolutions_before_processing(self) -> None:
         df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(self.file, self.dict_df)
         df_for_check = df[[register_fields.corresponding_account,
@@ -106,7 +106,7 @@ class AccountAnalysisProcessor(IFileProcessor):
         # запишем таблицу в словарь
         self.dict_df[self.file].table_for_check = df_for_check
 
-    @catch_and_log_exceptions(prefix='Удаляем строки с дублирующими оборотами в таблицах:')
+    @catch_and_log_exceptions(prefix='Удаляем строки с дублирующими оборотами в таблицах')
     def lines_delete(self):
         df, sign_1c, register, register_fields, *_ = self._get_data_from_table_storage(self.file, self.dict_df)
         df_delete = df[~df[register_fields.corresponding_account].isin(exclude_values)]
@@ -255,7 +255,7 @@ class AccountAnalysisProcessor(IFileProcessor):
         # Запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
-    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах:')
+    @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах')
     def revolutions_after_processing(self) -> None:
         df = self.dict_df[self.file].table
         df_for_check = self.dict_df[self.file].table_for_check
@@ -297,22 +297,25 @@ class AccountAnalysisProcessor(IFileProcessor):
 
     def reorder_table_columns(self) -> None:
         if not self.pivot_table.empty:
-            progress_bar(1, 3, prefix='Сортируем столбцы в нужном порядке:')
             list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
-            for n in list_lev[::-1]:
-                if all(self.pivot_table[n].apply(self._is_accounting_code)):
-                    self.pivot_table['Субсчет'] = self.pivot_table[n].copy()
-                    break
 
-            progress_bar(2, 3, prefix='Сортируем столбцы в нужном порядке:')
-            for p in list_lev:
-                if not all(self.pivot_table[p].apply(self._is_accounting_code)):
-                    self.pivot_table['Аналитика'] = self.pivot_table['Аналитика'].where(
-                        self.pivot_table['Аналитика'] != 'Не_указано', self.pivot_table[p])
-                    break
+            # Используем tqdm для отслеживания прогресса по шагам
+            for step in tqdm(range(3), desc='Сортируем столбцы в нужном порядке'.ljust(max_desc_length), unit='it'):
+                if step == 0:
+                    for n in list_lev[::-1]:
+                        if all(self.pivot_table[n].apply(self._is_accounting_code)):
+                            self.pivot_table['Субсчет'] = self.pivot_table[n].copy()
+                            break
 
-            progress_bar(3, 3, prefix='Сортируем столбцы в нужном порядке:')
-            self.pivot_table['Субсчет'] = self.pivot_table.apply(
-                lambda row: row['Субсчет'] if (str(row['Субсчет']) != '7') else f"0{row['Субсчет']}",
-                axis=1)
+                elif step == 1:
+                    for p in list_lev:
+                        if not all(self.pivot_table[p].apply(self._is_accounting_code)):
+                            self.pivot_table['Аналитика'] = self.pivot_table['Аналитика'].where(
+                                self.pivot_table['Аналитика'] != 'Не_указано', self.pivot_table[p])
+                            break
+
+                elif step == 2:
+                    self.pivot_table['Субсчет'] = self.pivot_table.apply(
+                        lambda row: row['Субсчет'] if (str(row['Субсчет']) != '7') else f"0{row['Субсчет']}",
+                        axis=1)
 

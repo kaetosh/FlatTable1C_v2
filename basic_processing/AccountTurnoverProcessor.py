@@ -8,7 +8,7 @@ from config import new_names
 from additional.decorators import catch_and_log_exceptions, logger
 
 class AccountTurnoverProcessor(IFileProcessor):
-    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах:')
+    @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах')
     def special_table_header(self) -> None:
         """
         В регистре Обороты счета наименования столбцов с оборотами с корреспондирующими счетами не имеют признака

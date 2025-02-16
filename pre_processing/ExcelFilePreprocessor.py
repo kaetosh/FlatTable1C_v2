@@ -14,14 +14,14 @@ Created on Mon Dec 16 16:35:32 2024
 from typing import List
 import openpyxl
 from pathlib import Path
-from config import analysis_fields
-from additional.progress_bar import progress_bar
+from config import analysis_fields, max_desc_length
+from tqdm import tqdm
 
 class ExcelFilePreprocessor:
     @staticmethod
     def preprocessor_openpyxl(excel_files: List[Path]) -> None:
-        for i, oFile in enumerate(excel_files):
-            progress_bar(i + 1, len(excel_files), prefix='Предобработка исходных файлов:')
+        # for i in tqdm(range(10), desc="Загрузка"):
+        for oFile in tqdm(excel_files, desc="Предобработка исходных файлов".ljust(max_desc_length)):
             workbook = None
             try:
                 workbook = openpyxl.load_workbook(oFile)

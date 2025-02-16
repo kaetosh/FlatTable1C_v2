@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 from loguru import logger
 import pandas as pd
-from additional.progress_bar import progress_bar
+from tqdm import tqdm
+from config import max_desc_length
 from additional.ErrorClasses import ContinueIteration
 
 # Настраиваем логгер для вывода только сообщений уровня ERROR
@@ -28,7 +29,7 @@ def catch_and_log_exceptions(prefix=''):
         @functools.wraps(method)
         def wrapper(self, *args, **kwargs):
             files_to_process = list(self.dict_df.keys()) or self.excel_files
-            for x, file in enumerate(files_to_process):
+            for file in tqdm(files_to_process, desc=prefix.ljust(max_desc_length)):
                 # Устанавливаем self.file или self.oFile в зависимости от типа
                 if isinstance(file, str):
                     self.file = file  # Если это строка
@@ -36,7 +37,7 @@ def catch_and_log_exceptions(prefix=''):
                     self.oFile = file  # Если это объект Path
                 else:
                     continue  # Пропускаем, если тип не поддерживается
-                progress_bar(x + 1, len(files_to_process), prefix=prefix)
+                #progress_bar(x + 1, len(files_to_process), prefix=prefix)
                 while True:
                     try:
                         method(self, *args, **kwargs)  # Вызов метода

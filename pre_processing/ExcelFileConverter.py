@@ -18,7 +18,9 @@ import os
 import win32com.client
 from typing import List
 from pathlib import Path
-from additional.progress_bar import progress_bar
+from tqdm import tqdm
+from config import max_desc_length
+
 
 class ExcelFileConverter:
     @staticmethod
@@ -26,8 +28,7 @@ class ExcelFileConverter:
         excel_app = win32com.client.Dispatch('Excel.Application')
         excel_app.Visible = False
         excel_app.DisplayAlerts = False
-        for i, file in enumerate(excel_files):
-            progress_bar(i + 1, len(excel_files), prefix='Пересохранение исходных файлов:')
+        for file in tqdm(excel_files, desc="Пересохранение исходных файлов".ljust(max_desc_length)):
             ExcelFileConverter.convert_file(excel_app, file)
         excel_app.Quit()
     @staticmethod
