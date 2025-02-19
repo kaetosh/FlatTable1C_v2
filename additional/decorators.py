@@ -17,6 +17,8 @@ from additional.ErrorClasses import ContinueIteration
 logger.remove()  # Удаляем стандартный обработчик
 logger.add(sys.stderr, level="ERROR")  # Добавляем новый обработчик для вывода в консоль
 
+
+
 def catch_and_log_exceptions(prefix=''):
     """
     Декоратор для ловли исключений в методе,
@@ -34,36 +36,48 @@ def catch_and_log_exceptions(prefix=''):
                 if isinstance(file, str):
                     self.file = file  # Если это строка
                 elif isinstance(file, Path):
-                    self.oFile = file  # Если это объект Path
+                    self.oFile = file
                 else:
                     continue  # Пропускаем, если тип не поддерживается
-                #progress_bar(x + 1, len(files_to_process), prefix=prefix)
                 while True:
                     try:
                         method(self, *args, **kwargs)  # Вызов метода
                         break  # Если все прошло успешно, выходим из внутреннего цикла
                     except ContinueIteration:
                         # Исключение для продолжения цикла
+                        self.empty_files.add(file) if isinstance(file, str) else self.empty_files.add(file.name)
+                        if self.dict_df and isinstance(file, str):
+                            self.dict_df.pop(file, None)
                         break  # Переход к следующему файлу
                     except pd.errors.EmptyDataError:
                         logger.debug(f"Файл {file} пуст.")
-                        self.empty_files.append(file)
+                        self.empty_files.add(file) if isinstance(file, str) else self.empty_files.add(file.name)
+                        if self.dict_df and isinstance(file, str):
+                            self.dict_df.pop(file, None)
                         break
                     except pd.errors.ParserError as e:
                         logger.debug(f"Ошибка парсинг в файле {file}: {e}")
-                        self.empty_files.append(file)
+                        self.empty_files.add(file) if isinstance(file, str) else self.empty_files.add(file.name)
+                        if self.dict_df and isinstance(file, str):
+                            self.dict_df.pop(file, None)
                         break
                     except KeyError as e:
                         logger.debug(f"Столбец не найден в файле {file}: {e}")
-                        self.empty_files.append(file)
+                        self.empty_files.add(file) if isinstance(file, str) else self.empty_files.add(file.name)
+                        if self.dict_df and isinstance(file, str):
+                            self.dict_df.pop(file, None)
                         break
                     except FileNotFoundError:
                         logger.debug(f"Файл не найден: {file}")
-                        self.empty_files.append(file)
+                        self.empty_files.add(file) if isinstance(file, str) else self.empty_files.add(file.name)
+                        if self.dict_df and isinstance(file, str):
+                            self.dict_df.pop(file, None)
                         break
                     except Exception as e:
                         logger.debug(f"Неожиданная ошибка в файле {file}: {str(e)}")
-                        self.empty_files.append(file)
+                        self.empty_files.add(file) if isinstance(file, str) else self.empty_files.add(file.name)
+                        if self.dict_df and isinstance(file, str):
+                            self.dict_df.pop(file, None)
                         break  # Переход к следующему файлу
         return wrapper
     return decorator

@@ -37,7 +37,7 @@ class IFileProcessor:
         self.excel_files: List[Path] =[] # список путей к обрабатываемым регистрам
         self.file_type = file_type # тип регистра (осв, анализ счета, обороты счета)
         self.dict_df: Dict[name_file_register, TableStorage] = {} # словарь со всеми обрабатываемыми регистрами и их характеристиками
-        self.empty_files: List[name_file_register] = [] # список имен не обработанных по разным причинам файлов (регистров)
+        self.empty_files: set[name_file_register] = set() # список имен не обработанных по разным причинам файлов (регистров)
         self.converter: ExcelFileConverter = ExcelFileConverter() # класс для пересохранения файлов (регистров)
         self.preprocessor: ExcelFilePreprocessor = ExcelFilePreprocessor() # класс для предварительной обработки файлов (регистров)
         self.register: Register1c = self._get_fields_register() # класс с полями обрабатываемых регистров
@@ -192,7 +192,7 @@ class IFileProcessor:
             df.columns.values[1] = 'Курсив'
 
             if df['Уровень'].max() == 0:
-                self.empty_files.append(self.oFile.name)
+                self.empty_files.add(self.oFile.name)
                 raise ContinueIteration
 
             sign_1c = self.register.get_outer_attribute_name_by_value(first_valid_value)
@@ -205,10 +205,10 @@ class IFileProcessor:
                 self.dict_df[self.oFile.name] = TableStorage(table=df, register=self.register, sign_1C=sign_1c)
             else:
                 # Названия пустых или проблемных файлов сохраним отдельно
-                self.empty_files.append(self.oFile.name)
+                self.empty_files.add(self.oFile.name)
         else:
             # Названия пустых или проблемных файлов сохраним отдельно
-            self.empty_files.append(self.oFile.name)
+            self.empty_files.add(self.oFile.name)
 
     @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах')
     def special_table_header(self) -> None:
@@ -307,7 +307,7 @@ class IFileProcessor:
 
         # пустой файл отправил в специальный список
         if max_level == 0:
-            self.empty_files.append(self.file)
+            # self.empty_files.add(self.file)
             raise ContinueIteration
 
         # разнесем уровни в горизонтальную ориентацию в цикле
@@ -338,7 +338,7 @@ class IFileProcessor:
         existing_columns = [i for i in df.columns if i in register_fields.get_attributes_by_suffix('_for_rename')]
 
         if df[df[register_fields.version_1c_id] == 'Итого'][existing_columns].empty:
-            self.empty_files.append(self.file)
+            # self.empty_files.add(self.file)
             raise ContinueIteration
 
         df_for_check = df[df[register_fields.version_1c_id] == 'Итого'][[register_fields.version_1c_id] + existing_columns].copy().tail(2).iloc[[0]]
@@ -541,8 +541,11 @@ class IFileProcessor:
         """
         Выгружает финальный файл в Excel: сводная таблица и таблица с отклонениями на отдельных листах.
         """
+        folder_path_summary_files = f"_Pivot_{self.file_type}.xlsx"
+        # Удаляем файл, если он существует
+        if os.path.exists(folder_path_summary_files):
+            os.remove(folder_path_summary_files)
         if not self.pivot_table.empty:
-            folder_path_summary_files = f"_Pivot_{self.file_type}.xlsx"
             with pd.ExcelWriter(folder_path_summary_files) as writer:
                 # Используем tqdm для отслеживания прогресса выгрузки
                 for step in tqdm(range(2), desc='Выгрузка сводной таблицы'.ljust(max_desc_length), unit='it'):
