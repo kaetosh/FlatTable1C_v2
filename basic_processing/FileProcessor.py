@@ -324,6 +324,7 @@ class IFileProcessor:
         # запишем таблицу в словарь
         self.dict_df[self.file].table = df
 
+
     #@catch_and_log_exceptions
     def corr_account_col(self) -> None:
         pass
@@ -409,6 +410,7 @@ class IFileProcessor:
         logger.debug(f'5={df.columns}')
 
 
+
     @catch_and_log_exceptions(prefix='Сохраняем данные по оборотам после обработки в таблицах')
     def revolutions_after_processing(self) -> None:
         """
@@ -463,6 +465,7 @@ class IFileProcessor:
                     self.pivot_table_check = pd.concat([self.pivot_table_check, df.reset_index(drop=True)],
                                                        ignore_index=True)
 
+
     def shiftable_level(self) -> None:
         """
         Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
@@ -492,6 +495,7 @@ class IFileProcessor:
                         )
                         continue_shifting = True  # Устанавливаем флаг, что сдвиг был произведен
 
+
     def reorder_table_columns(self) -> None:
         """
         Сортировка столбцов в нужном порядке.
@@ -501,11 +505,12 @@ class IFileProcessor:
             with tqdm(total=4, desc='Сортируем столбцы в нужном порядке'.ljust(max_desc_length), unit='it') as pbar:
                 register_fields = self._get_fields_register().upp  # upp или notupp без разницы, поля одинаковые
                 desired_order = register_fields.get_attributes_by_suffix('_for_rename')
+
                 pbar.update(1)
 
                 # Находим столбцы в таблице, заканчивающиеся на '_до' и '_ко'
-                do_columns = sorted(self.pivot_table.filter(regex='_до').columns.tolist())
-                ko_columns = sorted(self.pivot_table.filter(regex='_ко').columns.tolist())
+                do_columns = sorted(self.pivot_table.filter(regex='_до$').columns.tolist())
+                ko_columns = sorted(self.pivot_table.filter(regex='_ко$').columns.tolist())
                 pbar.update(1)
 
                 # Функция для вставки столбцов
@@ -518,8 +523,10 @@ class IFileProcessor:
                             raise NoExcelFilesError(f'Column {reference_column} not found in desired_order.')
 
                 # Вставляем столбцы с дебетовыми и кред оборотами в список заголовков
-                insert_columns(do_columns, register_fields.debit_quantity_turnover_for_rename)
-                insert_columns(ko_columns, register_fields.credit_quantity_turnover_for_rename)
+                if do_columns:
+                    insert_columns(do_columns, register_fields.debit_quantity_turnover_for_rename)
+                if ko_columns:
+                    insert_columns(ko_columns, register_fields.credit_quantity_turnover_for_rename)
                 pbar.update(1)
 
                 # Отберем столбцы c "Level_"
@@ -531,11 +538,14 @@ class IFileProcessor:
 
                 if register_fields.type_connection in self.pivot_table.columns:
                     desired_order = desired_order + [register_fields.type_connection]
+
                 # Отбор существующих столбцов
                 desired_order = [col for col in desired_order if col in self.pivot_table.columns]
+
                 # Используем reindex для сортировки DataFrame
                 self.pivot_table = self.pivot_table.reindex(columns=desired_order).copy()
                 pbar.update(1)
+
 
     def unloading_pivot_table(self) -> None:
         """
