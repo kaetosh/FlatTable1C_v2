@@ -4,21 +4,21 @@ Created on Mon Dec 16 14:42:39 2024
 
 @author: a.karabedyan
 """
-from typing import Literal
+
 from config import START_TEXT
 from basic_processing.FileProcessorFactory import FileProcessorFactory
 
 def main():
     print(START_TEXT)
-    file_type: list[Literal['account_turnover', 'account_analysis', 'account_osv']] = ['account_turnover', 'account_analysis', 'account_osv']
+    file_type = ['account_turnover', 'account_analysis', 'account_osv', 'osv_general']
     while True:
         try:
             number_register = int(
-                input('Введи номер для обрабатываемого регистра и нажми Enter\n0 - Обороты счета\n1 - Анализ счета\n2 - ОСВ:\n '))
-            if number_register in [0, 1, 2]:
+                input('Введи номер для обрабатываемого регистра и нажми Enter\n0 - Обороты счета\n1 - Анализ счета\n2 - ОСВ счета\n3 - ОСВ общая:\n '))
+            if number_register in [0, 1, 2, 3]:
                 break
             else:
-                print("Некорректный ввод. Пожалуйста, введите 0, 1 или 2.")
+                print("Некорректный ввод. Пожалуйста, введите 0, 1, 2 или 3")
         except ValueError:
             print("Некорректный ввод. Пожалуйста, введите целое число.")
     processor = FileProcessorFactory.create_processor(file_type[number_register])

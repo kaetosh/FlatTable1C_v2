@@ -14,7 +14,7 @@ from pathlib import Path
 from tqdm import tqdm
 from additional.decorators import catch_and_log_exceptions, logger
 from basic_processing.Register1C import Register1c, FieldsRegister, TableStorage
-from config import osv_fields, turnover_fields, analysis_fields, exclude_values, max_desc_length
+from config import osv_fields, osv_fields_general, turnover_fields, analysis_fields, exclude_values, max_desc_length
 from additional.ErrorClasses import NoExcelFilesError, ContinueIteration
 from pre_processing.ExcelFileConverter import ExcelFileConverter
 from pre_processing.ExcelFilePreprocessor import ExcelFilePreprocessor
@@ -57,6 +57,8 @@ class IFileProcessor:
                 return analysis_fields
             case "account_osv":
                 return osv_fields
+            case "osv_general":
+                return osv_fields_general
             case _:
                 raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
 
@@ -209,6 +211,7 @@ class IFileProcessor:
         else:
             # Названия пустых или проблемных файлов сохраним отдельно
             self.empty_files.add(self.oFile.name)
+
 
     @catch_and_log_exceptions(prefix='Установка специальных заголовков в таблицах')
     def special_table_header(self) -> None:

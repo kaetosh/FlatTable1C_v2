@@ -30,6 +30,7 @@ def _get_class_attributes(cl: Type) -> List[str]:
 class FieldsRegister:
     def __init__(self,
                  analytics: Optional[str] = None, # субконто счета
+                 account_name: Optional[str] = None, # наименование счета (для общей ОСВ)
                  quantity: Optional[str] = None, # количество
                  type_connection: Optional[str] = None, # вид связи контрагента (признак компании группы)
                  corresponding_account: Optional[str] = None, # корреспондирующий счет
@@ -41,6 +42,7 @@ class FieldsRegister:
                  end_credit_balance: Optional[str] = None, # исходящий кредитовый остаток
                  version_1c_id: Optional[str] = None): # поле для различения версии 1С (для осв и оборотов совпадает с параметром analytics, анализа счета - corresponding_account)
         self.analytics = analytics
+        self.account_name = account_name
         self.quantity = quantity
         self.type_connection = type_connection
         self.corresponding_account = corresponding_account
@@ -51,6 +53,7 @@ class FieldsRegister:
         self.end_debit_balance = end_debit_balance
         self.end_credit_balance = end_credit_balance
         self.version_1c_id = version_1c_id
+        self.account_name_for_rename = 'Наименование' # наименование счета для ОСВ общей для единообразия имен полей
         self.start_debit_balance_for_rename = 'Дебет_начало' # входящий дебетовый остаток для единообразия имен полей
         self.start_quantity_debit_balance_for_rename = 'Количество_Дебет_начало'
         self.start_credit_balance_for_rename = 'Кредит_начало' # входящий кредитовый остаток для единообразия имен полей
@@ -68,13 +71,14 @@ class FieldsRegister:
         self.end_balance_before_processing = 'Сальдо_конец_до_обработки'
         self.start_balance_after_processing = 'Сальдо_начало_после_обработки'
         self.turnover_after_processing = 'Оборот_после_обработки'
-        self.end_balance_after_processing = 'Сальдо_конец_после_обработки' 
+        self.end_balance_after_processing = 'Сальдо_конец_после_обработки'
         self.start_balance_deviation = 'Сальдо_начало_разница'
         self.turnover_deviation = 'Оборот_разница'
         self.end_balance_deviation = 'Сальдо_конец_разница'
-        self.file_name = 'Исх.файл' 
+        self.file_name = 'Исх.файл'
     def __iter__(self):
         return iter((self.analytics,
+                     self.account_name,
                      self.quantity,
                      self.type_connection,
                      self.corresponding_account,
@@ -93,6 +97,7 @@ class FieldsRegister:
         Получить список имен полей по концовке имени аттрибута.
         """
         attributes = [
+            'account_name_for_rename',
             'start_debit_balance_for_rename',
             'start_quantity_debit_balance_for_rename',
             'start_credit_balance_for_rename',

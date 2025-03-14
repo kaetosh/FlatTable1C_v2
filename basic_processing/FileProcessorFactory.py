@@ -14,12 +14,14 @@ from basic_processing.FileProcessor import IFileProcessor
 from basic_processing.AccountTurnoverProcessor import AccountTurnoverProcessor
 from basic_processing.AccountAnalisysProcessor import AccountAnalysisProcessor
 from basic_processing.AccountOSVProcessor import AccountOSVProcessor
+from basic_processing.OSVGeneralProcessor import OSVGeneralProcessor
 
 class FileProcessorFactory:
     @staticmethod
     def create_processor(file_type: Literal['account_turnover',
                                             'account_analysis',
-                                            'account_osv']) -> IFileProcessor:
+                                            'account_osv',
+                                            'osv_general']) -> IFileProcessor:
         match file_type:
             case "account_turnover":
                 return AccountTurnoverProcessor(file_type)
@@ -27,5 +29,7 @@ class FileProcessorFactory:
                 return AccountAnalysisProcessor(file_type)
             case "account_osv":
                 return AccountOSVProcessor(file_type)
+            case "osv_general":
+                return OSVGeneralProcessor(file_type)
             case _:
                 raise NoExcelFilesError
