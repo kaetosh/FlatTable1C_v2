@@ -469,6 +469,35 @@ class IFileProcessor:
                                                        ignore_index=True)
 
 
+    # def shiftable_level(self) -> None:
+    #     """
+    #     Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
+    #     """
+    #     if not self.pivot_table.empty:
+    #         list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
+    #         continue_shifting = True
+    #         iteration = 0  # Переменная для отслеживания номера итерации
+
+    #         while continue_shifting:
+    #             continue_shifting = False
+    #             iteration += 1  # Увеличиваем номер итерации
+
+    #             # Обновляем описание прогресс-бара с номером итерации
+    #             desc = f"Выравниваем столбцы со счетами в таблицах (итерация {iteration})".ljust(
+    #                 max_desc_length)
+
+    #             for i in tqdm(list_lev, desc=desc):
+    #                 # Если в столбце есть и субсчет, и субконто, нужно выравнивать столбцы
+    #                 if self.pivot_table[i].apply(self._is_accounting_code).nunique() == 2:
+    #                     lm = int(i.split('_')[-1])  # Получим его хвостик столбца
+    #                     new_list_lev = list_lev[lm:]
+    #                     # Сдвигаем:
+    #                     self.pivot_table[new_list_lev] = self.pivot_table.apply(
+    #                         lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
+    #                             x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1
+    #                     )
+    #                     continue_shifting = True  # Устанавливаем флаг, что сдвиг был произведен
+
     def shiftable_level(self) -> None:
         """
         Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
@@ -483,8 +512,10 @@ class IFileProcessor:
                 iteration += 1  # Увеличиваем номер итерации
 
                 # Обновляем описание прогресс-бара с номером итерации
-                desc = f"Выравниваем столбцы со счетами в таблицах (итерация {iteration})".ljust(
-                    max_desc_length)
+                desc = f"Выравниваем столбцы со счетами в таблицах (итерация {iteration})".ljust(max_desc_length)
+
+                # Сохраняем текущее состояние таблицы для проверки изменений
+                previous_table_state = self.pivot_table.copy()
 
                 for i in tqdm(list_lev, desc=desc):
                     # Если в столбце есть и субсчет, и субконто, нужно выравнивать столбцы
@@ -498,6 +529,10 @@ class IFileProcessor:
                         )
                         continue_shifting = True  # Устанавливаем флаг, что сдвиг был произведен
 
+                # Проверяем, изменилось ли состояние таблицы
+                if previous_table_state.equals(self.pivot_table):
+                    #print("Нет изменений в таблице, выходим из цикла.")
+                    break  # Выходим из цикла, если изменений не произошло
 
     def reorder_table_columns(self) -> None:
         """
