@@ -121,7 +121,8 @@ class IFileProcessor:
         files = list(path_folder_excel_files.iterdir())
         path_excel_files: List[Path] = [file for file in files if (str(file).endswith('.xlsx')
                                                                    or str(file).endswith('.xls'))
-                                        and '_Pivot_' not in str(file)]
+                                                                    and '_Pivot_' not in str(file)
+                                                                    and not str(file.name).startswith('~$')]
         if not path_excel_files:
             raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
         return path_excel_files
