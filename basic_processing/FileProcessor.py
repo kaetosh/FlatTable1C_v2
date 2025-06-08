@@ -31,11 +31,15 @@ class IFileProcessor:
 
     def __init__(self, file_type: Literal['account_turnover',
                                           'account_analysis',
-                                          'account_osv']) -> None:
+                                          'account_osv',
+                                          'osv_general']) -> None:
         self.pivot_table_check: pd.DataFrame = pd.DataFrame() # свод таблица с отклонениями по всем обработанным регистрам
         self.pivot_table: pd.DataFrame = pd.DataFrame() # свод таблица по всем обработанным регистрам
         self.excel_files: List[Path] =[] # список путей к обрабатываемым регистрам
-        self.file_type = file_type # тип регистра (осв, анализ счета, обороты счета)
+        self.file_type: Literal['account_turnover',
+                                'account_analysis',
+                                'account_osv',
+                                'osv_general'] = file_type # тип регистра (осв, анализ счета, обороты счета)
         self.dict_df: Dict[name_file_register, TableStorage] = {} # словарь со всеми обрабатываемыми регистрами и их характеристиками
         self.empty_files: set[name_file_register] = set() # список имен не обработанных по разным причинам файлов (регистров)
         self.converter: ExcelFileConverter = ExcelFileConverter() # класс для пересохранения файлов (регистров)
@@ -44,7 +48,7 @@ class IFileProcessor:
         self.oFile: Optional[Path] = None # путь к текущему файлу в обработке
         self.file: str = "" # имя текущего файла в обработке
 
-    def _get_fields_register(self) -> Register1c:
+    def _get_fields_register(self) -> Optional[Register1c]:
         """
         На основе типа регистра (анализ счета, обороты счета или осв) возвращает
         соответствующий этому типу экземпляр класса регистра, содержащий поля
@@ -52,19 +56,19 @@ class IFileProcessor:
         """
         match self.file_type:
             case "account_turnover":
-                return turnover_fields
+                return turnover_fields # type: ignore
             case "account_analysis":
-                return analysis_fields
+                return analysis_fields # type: ignore
             case "account_osv":
-                return osv_fields
+                return osv_fields # type: ignore
             case "osv_general":
-                return osv_fields_general
+                return osv_fields_general # type: ignore
             case _:
                 raise NoExcelFilesError('Нет доступных Excel файлов для обработки.')
 
     @staticmethod
     def _get_data_from_table_storage(file: name_file_table,
-                                     dict_df: [name_file_table, TableStorage]) -> Tuple[table,
+                                     dict_df: Dict[name_file_table, TableStorage]) -> Tuple[table,
                                                                                         Literal['upp', 'notupp'],
                                                                                         Register1c,
                                                                                         FieldsRegister,
@@ -469,35 +473,6 @@ class IFileProcessor:
                     self.pivot_table_check = pd.concat([self.pivot_table_check, df.reset_index(drop=True)],
                                                        ignore_index=True)
 
-
-    # def shiftable_level(self) -> None:
-    #     """
-    #     Выравнивает столбцы таким образом, чтобы бухгалтерские счета находились в одном столбце.
-    #     """
-    #     if not self.pivot_table.empty:
-    #         list_lev = [i for i in self.pivot_table.columns.to_list() if 'Level' in i]
-    #         continue_shifting = True
-    #         iteration = 0  # Переменная для отслеживания номера итерации
-
-    #         while continue_shifting:
-    #             continue_shifting = False
-    #             iteration += 1  # Увеличиваем номер итерации
-
-    #             # Обновляем описание прогресс-бара с номером итерации
-    #             desc = f"Выравниваем столбцы со счетами в таблицах (итерация {iteration})".ljust(
-    #                 max_desc_length)
-
-    #             for i in tqdm(list_lev, desc=desc):
-    #                 # Если в столбце есть и субсчет, и субконто, нужно выравнивать столбцы
-    #                 if self.pivot_table[i].apply(self._is_accounting_code).nunique() == 2:
-    #                     lm = int(i.split('_')[-1])  # Получим его хвостик столбца
-    #                     new_list_lev = list_lev[lm:]
-    #                     # Сдвигаем:
-    #                     self.pivot_table[new_list_lev] = self.pivot_table.apply(
-    #                         lambda x: pd.Series([x[i] for i in new_list_lev]) if self._is_accounting_code(
-    #                             x[new_list_lev[0]]) else pd.Series([x[i] for i in list_lev[lm - 1:-1]]), axis=1
-    #                     )
-    #                     continue_shifting = True  # Устанавливаем флаг, что сдвиг был произведен
 
     def shiftable_level(self) -> None:
         """

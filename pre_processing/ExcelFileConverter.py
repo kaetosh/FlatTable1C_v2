@@ -24,16 +24,20 @@ import tempfile
 from zipfile import ZipFile
 import shutil
 
+
 class ExcelFileConverter:
     @staticmethod
     def save_as_xlsx_no_alert(excel_files: List[Path]) -> None:
-        # excel_app = win32com.client.Dispatch('Excel.Application')
-        # excel_app.Visible = False
-        # excel_app.DisplayAlerts = False
         for file in tqdm(excel_files, desc="Пересохранение исходных файлов".ljust(max_desc_length)):
-            ExcelFileConverter.fix_excel_filename(file)
-            # ExcelFileConverter.convert_file(excel_app, file)
-        # excel_app.Quit()
+            if file.suffix.lower() != 'xls':
+                excel_app = win32com.client.Dispatch('Excel.Application')
+                excel_app.Visible = False
+                excel_app.DisplayAlerts = False
+                ExcelFileConverter.convert_file(excel_app, file)
+                excel_app.Quit()
+            else:
+                ExcelFileConverter.fix_excel_filename(file)
+
     @staticmethod
     def convert_file(excel_app: win32com.client.CDispatch, file: Path) -> None:
         name_xlsx = str(file).replace('.xls', '.xlsx') if str(file).endswith('.xls') else str(file)
@@ -46,22 +50,16 @@ class ExcelFileConverter:
     def fix_excel_filename(excel_file_path: Path) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_folder = Path(tmp_dir)
-
             with ZipFile(excel_file_path) as excel_container:
                 excel_container.extractall(tmp_folder)
-
             wrong_file_path = tmp_folder / 'xl' / 'SharedStrings.xml'
             correct_file_path = tmp_folder / 'xl' / 'sharedStrings.xml'
-
             if wrong_file_path.exists():
                 os.rename(wrong_file_path, correct_file_path)
-
                 # Создаем архив с новым именем
                 tmp_zip_path = excel_file_path.with_suffix('.zip')
                 shutil.make_archive(str(excel_file_path.with_suffix('')), 'zip', tmp_folder)
-
                 # Удаляем исходный файл и переименовываем новый архив
                 if excel_file_path.exists():
                     os.remove(excel_file_path)
-
                 os.rename(tmp_zip_path, excel_file_path)

@@ -40,7 +40,7 @@ class OSVGeneralProcessor(IFileProcessor):
         df.columns = df.columns.astype(str)
         df = df.iloc[1:]
 
-        #переименуем столбец с названиями счетов для единообразия выгрузок УПП и неУПП
+        # переименуем столбец с названиями счетов для единообразия выгрузок УПП и неУПП
         df = df.rename(columns={register_fields.account_name: register_fields.account_name_for_rename})
 
         # добавим нолик, если счет до 10, чтобы было 01 02 04 05 07 08 09
